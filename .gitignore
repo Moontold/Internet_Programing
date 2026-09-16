@@ -1,0 +1,33 @@
+# secrets
+.env
+backend/.env
+*.key
+MY_API_KEY.txt
+
+# IDE / venv
+.idea/
+.vscode/
+.venv/
+__pycache__/
+*.pyc
+
+# OS
+.DS_Store
+Thumbs.db
+
+# frontend
+frontend/node_modules/
+frontend/dist/
+*.tsbuildinfo
+
+# data
+uploads/
+docker-compose.override.yml
+
+# служебные файлы ИИ-ассистентов и рабочие заметки
+CLAUDE.md
+claude.md
+handoff.md
+.claude/
+.cursor/
+.aider*
