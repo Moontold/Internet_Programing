@@ -11,13 +11,13 @@ import { MoveLessonModal } from '../../components/MoveLessonModal';
 import { ParticipantsTable } from '../../components/ParticipantsTable';
 import { askCancelScope } from '../../components/ScopeDialog';
 import { fmtDateTime, weekdayName } from '../../lib/dates';
-import { lessonFormatLabel, statusColor, statusLabel } from '../../lib/format';
+import { formatLabel, statusColor, statusLabel } from '../../lib/format';
 
 const metaLine = (lesson: Lesson) =>
   [
     `${lesson.duration_minutes} мин`,
     lesson.title,
-    lessonFormatLabel(lesson.participants),
+    lesson.format ? formatLabel[lesson.format] : null,
     lesson.detached ? 'изменено отдельно от серии' : null,
   ]
     .filter(Boolean)

@@ -1,4 +1,4 @@
-import type { HomeworkStatus, LessonFormat, LessonParticipant, LessonStatus } from '../api/types';
+import type { HomeworkStatus, LessonFormat, LessonStatus } from '../api/types';
 
 export const fmtMoney = (value: number) => `${value.toLocaleString('ru-RU')} ₽`;
 
@@ -22,9 +22,3 @@ export const homeworkStatusLabel: Record<HomeworkStatus, string> = {
 
 export const gradeLabel = (student: { grade: number | null; grade_note: string }) =>
   [student.grade ? `${student.grade} класс` : null, student.grade_note || null].filter(Boolean).join(', ') || '—';
-
-export function lessonFormatLabel(participants: LessonParticipant[]): string | null {
-  const formats = [...new Set(participants.map((p) => p.format).filter((f): f is LessonFormat => Boolean(f)))];
-  if (formats.length === 0) return null;
-  return formats.length === 1 ? formatLabel[formats[0]] : 'Очно и онлайн';
-}

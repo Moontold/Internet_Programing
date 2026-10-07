@@ -116,7 +116,6 @@ export interface FileInfo {
 export interface LessonParticipant {
   student_id: number;
   full_name: string;
-  format?: LessonFormat;
   homework_status: HomeworkStatus | null;
   homework_grade: number | null;
 }
@@ -129,6 +128,7 @@ export interface LessonShort {
   detached: boolean;
   topic: string;
   title: string;
+  format: LessonFormat | null;
   participants: LessonParticipant[];
   has_homework: boolean;
 }
