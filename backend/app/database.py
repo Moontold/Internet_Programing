@@ -9,7 +9,7 @@ from app.config import settings
 
 
 class Base(DeclarativeBase):
-    """Базовый класс ORM-моделей. Сами модели появятся во втором спринте."""
+    """Базовый класс ORM-моделей: модели лежат в app/models, схема БД — в миграциях Alembic."""
 
 
 class CConnection(Connection):
