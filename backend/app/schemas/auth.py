@@ -24,3 +24,11 @@ class Profile(BaseModel):
 
 class ProfileResponse(BaseResponse):
     payload: Profile | None = Field(default=None, description='Профиль текущего пользователя')
+
+
+class PasswordPayload(BaseModel):
+    password: str = Field(..., description='Новый пароль: показывается один раз, дальше хранится только хеш')
+
+
+class PasswordResponse(BaseResponse):
+    payload: PasswordPayload | None = Field(default=None, description='Сгенерированный пароль')

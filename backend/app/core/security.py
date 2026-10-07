@@ -6,6 +6,7 @@ from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
 
 _hasher = PasswordHasher()
+_TEMP_ALPHABET = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 
 # Хеш случайной строки: с ним сверяется пароль, когда логина нет, чтобы ответ
 # по несуществующему логину занимал столько же времени, сколько по существующему.
@@ -29,3 +30,8 @@ def generate_session_token() -> str:
 
 def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode('utf-8')).hexdigest()
+
+
+def generate_temp_password(length: int = 10) -> str:
+    """Разовый пароль при сбросе: буквы и цифры без похожих символов (0/O, 1/l/I)."""
+    return ''.join(secrets.choice(_TEMP_ALPHABET) for _ in range(length))

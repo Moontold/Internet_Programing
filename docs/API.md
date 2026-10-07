@@ -38,3 +38,38 @@
 | `POST /auth/change-password` | вошедший | `{old_password, new_password}` → `null` | Смена своего пароля (не короче 8 символов); остальные сессии пользователя завершаются |
 
 `Profile`: `{id, role: 'tutor' | 'parent' | 'student', full_name, login}`.
+
+## 3. Родители — `/api/parents`
+
+Раздел репетитора: родителю и ученику отвечает `403`.
+
+| Метод и путь | Тело → `payload` | Что делает |
+|---|---|---|
+| `GET /parents?is_active=` | — → `{parents: Parent[]}` | Список по алфавиту; `is_active=true/false` фильтрует по активности учётки |
+| `POST /parents` | `ParentCreate` → `{parent, password}` | Создаёт учётку родителя; пароль задаёт репетитор, в ответе он показывается один раз |
+| `GET /parents/{id}` | — → `Parent` | Карточка с детьми |
+| `PATCH /parents/{id}` | `ParentUpdate` → `Parent` | Частичная правка; `is_active: false` запрещает вход и завершает сессии |
+| `POST /parents/{id}/reset-password` | — → `{password}` | Новый пароль из 10 символов, сессии родителя завершаются |
+
+- `ParentCreate`: `{full_name, login, password, phone?, contacts_note?}`; логин — латиница,
+  цифры и `_ . -`, от 3 символов; пароль не короче 8 символов.
+- `Parent`: `{id, full_name, phone, login, contacts_note, is_active, children: [{id, full_name, grade, is_active}]}`.
+
+## 4. Ученики — `/api/students`
+
+Раздел репетитора: родителю и ученику отвечает `403`.
+
+| Метод и путь | Тело → `payload` | Что делает |
+|---|---|---|
+| `GET /students?is_active=` | — → `{students: StudentListItem[]}` | Список по алфавиту с родителем; фильтр «только активные» |
+| `POST /students` | `StudentCreate` → `{student, password}` | Создаёт учётку ученика, привязанного к родителю |
+| `GET /students/{id}` | — → `Student` | Карточка ученика |
+| `PATCH /students/{id}` | `StudentUpdate` → `Student` | Частичная правка; `parent_id` перепривязывает к другому родителю, явный `grade: null` сбрасывает класс, `is_active: false` деактивирует |
+| `POST /students/{id}/reset-password` | — → `{password}` | Новый пароль из 10 символов, сессии ученика завершаются |
+
+- `StudentCreate`: `{full_name, login, password, parent_id, grade?: 1..11, grade_note?, format: 'online' | 'offline', price_per_lesson?}`.
+- `StudentListItem`: `{id, full_name, grade, grade_note, format, is_active, parent: {id, full_name, phone}}`.
+- `Student` = `StudentListItem` + `{login, price_per_lesson}`.
+
+Деактивированный ученик или родитель не может войти («Учётная запись отключена»);
+данные и история занятий остаются.
