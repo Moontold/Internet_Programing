@@ -5,6 +5,11 @@ import { RequireRole } from './auth/RequireRole';
 import { AppShell } from './components/AppShell';
 import { SectionPlaceholder } from './components/SectionPlaceholder';
 import { LoginPage } from './pages/common/LoginPage';
+import { ProfilePage } from './pages/common/ProfilePage';
+import { ParentCardPage } from './pages/tutor/ParentCardPage';
+import { ParentsPage } from './pages/tutor/ParentsPage';
+import { StudentCardPage } from './pages/tutor/StudentCardPage';
+import { StudentsPage } from './pages/tutor/StudentsPage';
 
 function Home() {
   const { user } = useAuth();
@@ -17,12 +22,14 @@ export function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route element={<RequireRole roles={['tutor', 'parent', 'student']} />}>
         <Route path="/" element={<Home />} />
-        <Route path="/profile" element={<AppShell><SectionPlaceholder title="Профиль" /></AppShell>} />
+        <Route path="/profile" element={<AppShell><ProfilePage /></AppShell>} />
       </Route>
       <Route element={<RequireRole roles={['tutor']} />}>
         <Route path="/schedule" element={<AppShell><SectionPlaceholder title="Расписание" /></AppShell>} />
-        <Route path="/students" element={<AppShell><SectionPlaceholder title="Ученики" /></AppShell>} />
-        <Route path="/parents" element={<AppShell><SectionPlaceholder title="Родители" /></AppShell>} />
+        <Route path="/students" element={<AppShell><StudentsPage /></AppShell>} />
+        <Route path="/students/:studentId" element={<AppShell><StudentCardPage /></AppShell>} />
+        <Route path="/parents" element={<AppShell><ParentsPage /></AppShell>} />
+        <Route path="/parents/:parentId" element={<AppShell><ParentCardPage /></AppShell>} />
       </Route>
       <Route element={<RequireRole roles={['parent']} />}>
         <Route path="/children" element={<AppShell><SectionPlaceholder title="Дети" /></AppShell>} />
