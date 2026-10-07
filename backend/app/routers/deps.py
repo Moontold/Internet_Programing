@@ -7,7 +7,9 @@ from app.config import settings
 from app.database import get_session
 from app.models import Role, User
 from app.services.auth_service import AuthService
+from app.services.lesson_service import LessonService
 from app.services.parent_service import ParentService
+from app.services.series_service import SeriesService
 from app.services.student_service import StudentService
 
 SESSION_COOKIE = 'session'
@@ -51,6 +53,14 @@ def get_parent_service(db: AsyncSession = Depends(get_session)) -> ParentService
 
 def get_student_service(db: AsyncSession = Depends(get_session)) -> StudentService:
     return StudentService(db=db)
+
+
+def get_series_service(db: AsyncSession = Depends(get_session)) -> SeriesService:
+    return SeriesService(db=db)
+
+
+def get_lesson_service(db: AsyncSession = Depends(get_session)) -> LessonService:
+    return LessonService(db=db)
 
 
 def get_session_token(request: Request) -> Optional[str]:

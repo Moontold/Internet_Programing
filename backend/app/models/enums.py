@@ -10,3 +10,9 @@ class Role(StrEnum):
 class LessonFormat(StrEnum):
     OFFLINE = 'offline'
     ONLINE = 'online'
+
+
+class LessonStatus(StrEnum):
+    PLANNED = 'planned'
+    HELD = 'held'
+    CANCELLED = 'cancelled'

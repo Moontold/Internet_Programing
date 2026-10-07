@@ -1,16 +1,20 @@
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.core.errors import AppError
 from app.core.security import generate_temp_password, hash_password
 from app.models import Role, Student, User
 from app.repositories.parent_repository import ParentRepository
+from app.repositories.series_repository import SeriesRepository
 from app.repositories.session_repository import SessionRepository
 from app.repositories.student_repository import StudentRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas import student as schemas
 from app.services.parent_service import to_parent_short
+from app.services.series_service import to_series_schema
 
 
 def to_student_short(student: Student) -> schemas.StudentShort:
@@ -38,6 +42,7 @@ class StudentService:
         self._parents = ParentRepository(db=db)
         self._users = UserRepository(db=db)
         self._sessions = SessionRepository(db=db)
+        self._series = SeriesRepository(db=db)
 
     async def _get_or_raise(self, student_id: int) -> Student:
         student = await self._students.get(student_id=student_id)
@@ -50,10 +55,13 @@ class StudentService:
             raise AppError('Родитель не найден')
 
     async def build_card(self, student: Student) -> schemas.Student:
+        today = datetime.now(timezone.utc).astimezone(settings.tz).date()
+        series = await self._series.list_active_for_student(student_id=student.id, today=today)
         return schemas.Student(
             **to_student_list_item(student=student).model_dump(),
             login=student.user.login,
             price_per_lesson=student.price_per_lesson,
+            series=[to_series_schema(series=item) for item in series],
         )
 
     async def list(self, is_active: Optional[bool]) -> schemas.StudentsList:

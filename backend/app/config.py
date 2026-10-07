@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     app_origin: str = 'http://localhost'
     app_timezone: str = 'Europe/Moscow'
     session_days: int = 30
+    schedule_horizon_weeks: int = Field(default=12, ge=1, le=52)
 
     @property
     def database_url(self) -> str:

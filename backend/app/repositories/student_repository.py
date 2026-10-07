@@ -22,6 +22,12 @@ class StudentRepository:
         result = await self._db.execute(self._base().where(Student.id == student_id))
         return result.scalar_one_or_none()
 
+    async def get_many(self, ids: list[int]) -> Sequence[Student]:
+        if not ids:
+            return []
+        result = await self._db.execute(self._base().where(Student.id.in_(ids)))
+        return result.scalars().all()
+
     async def list_all(self, is_active: Optional[bool] = None) -> Sequence[Student]:
         stmt = self._base().order_by(User.full_name, Student.id)
         if is_active is not None:

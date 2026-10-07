@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 
 from app.schemas.base import BaseResponse
 from app.schemas.parent import LOGIN_PATTERN, ParentShort
+from app.schemas.series import Series
 
 Format = Literal['offline', 'online']
 
@@ -24,6 +25,7 @@ class StudentListItem(StudentShort):
 class Student(StudentListItem):
     login: str = Field(..., description='Логин')
     price_per_lesson: int = Field(..., description='Ставка за занятие, руб.')
+    series: list[Series] = Field(default_factory=list, description='Действующие серии: регулярное расписание')
 
 
 class StudentsList(BaseModel):

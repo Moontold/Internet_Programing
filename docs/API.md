@@ -69,7 +69,64 @@
 
 - `StudentCreate`: `{full_name, login, password, parent_id, grade?: 1..11, grade_note?, format: 'online' | 'offline', price_per_lesson?}`.
 - `StudentListItem`: `{id, full_name, grade, grade_note, format, is_active, parent: {id, full_name, phone}}`.
-- `Student` = `StudentListItem` + `{login, price_per_lesson}`.
+- `Student` = `StudentListItem` + `{login, price_per_lesson, series: Series[]}`, где `series` —
+  действующие серии ученика (его регулярное расписание).
 
 Деактивированный ученик или родитель не может войти («Учётная запись отключена»);
 данные и история занятий остаются.
+
+## 5. Серии занятий — `/api/series`
+
+Раздел репетитора. Серия — правило «каждые N недель в такое-то время» с датой окончания
+или бессрочно; в серии один или несколько учеников.
+
+| Метод и путь | Тело → `payload` | Что делает |
+|---|---|---|
+| `POST /series` | `SeriesCreate` → `Series` | Создаёт серию и сразу порождает занятия на `SCHEDULE_HORIZON_WEEKS` недель вперёд; прошедшие вхождения рождаются «проведёнными» |
+| `PATCH /series/{id}` | `SeriesUpdate` → `Series` | Правка в режиме «все занятия» (см. ниже); явный `until: null` делает серию бессрочной |
+| `POST /series/{id}/stop` | `{from_date}` → `Series` | Остановка: с `from_date` занятий нет, проведённые и отменённые остаются |
+
+- `SeriesCreate`: `{first_start, duration_minutes: 15..480, interval_weeks: 1..8, until?, title?, student_ids}`.
+- `Series`: `{id, first_start, duration_minutes, interval_weeks, until, title, students: [{id, full_name}]}`.
+
+## 6. Занятия — `/api/lessons`
+
+Раздел репетитора. Удалённые занятия в выборки не попадают.
+
+| Метод и путь | Тело → `payload` | Что делает |
+|---|---|---|
+| `GET /lessons?start=&end=&student_id=` | — → `{lessons: LessonShort[]}` | Занятия, начинающиеся в `[start, end)` (не больше года), по времени |
+| `POST /lessons` | `{scheduled_start, duration_minutes, title?, student_ids}` → `Lesson` | Разовое занятие вне серии; `title` становится темой |
+| `GET /lessons/{id}` | — → `Lesson` | Занятие |
+| `PATCH /lessons/{id}` | `LessonUpdate` → `Lesson` | Перенос, длительность, состав — с областью `scope`; тема — всегда только у этого занятия |
+| `POST /lessons/{id}/cancel` | `{scope: 'this' \| 'following'}` → `Lesson` | Отмена; проведённое тоже можно отменить |
+| `DELETE /lessons/{id}?scope=this\|following` | — → `null` | Удаление; проведённое удалить нельзя |
+
+- `LessonShort`: `{id, series_id, scheduled_start, duration_minutes, status: 'planned' | 'held' | 'cancelled',
+  detached, topic, title, participants: [{student_id, full_name, price}]}`; `title` — название серии.
+- `Lesson` = `LessonShort` + `{original_start}` — исходное место занятия в серии.
+- `LessonUpdate`: `{scope: 'this' | 'following' | 'all', scheduled_start?, duration_minutes?, student_ids?, topic?}`.
+
+### Области правки
+
+| `scope` | Перенос, длительность, состав | Отмена | Удаление |
+|---|---|---|---|
+| `this` — только это | Меняется одно занятие, оно становится отделённым (`detached`) | Занятие отменено | Занятие скрыто |
+| `following` — это и последующие | Серия заканчивается накануне, с этого занятия начинается новая с новыми параметрами; последующие перестраиваются, отделённые сохраняют своё время | Серия заканчивается накануне, последующие запланированные снимаются | Это и последующие запланированные скрыты |
+| `all` — все занятия | Правило серии сдвигается на ту же дельту, меняются все запланированные неотделённые | — | — |
+
+Правила, общие для всех областей: проведённые занятия не меняются; проведённое нельзя
+перенести или удалить, только отменить; отменённое не редактируется; у разового занятия
+есть только `this`. Отменённые и удалённые занятия держат своё место в серии — после правки
+серии на их неделе новое занятие не появляется. Сдвиг «всех» ровно на целое число периодов
+серии (например, на неделю при еженедельной серии) отклоняется.
+
+### Фоновый worker
+
+Отдельный контейнер `worker` (тот же образ, команда `python -m app.worker.main`):
+
+| Период | Задача |
+|---|---|
+| 1 минута | Запланированные занятия, время которых закончилось, становятся проведёнными |
+| 1 час | Действующие серии дополняются занятиями до горизонта; удалённые не порождаются заново |
+| 1 сутки | Удаляются истёкшие сессии и записи о попытках входа старше суток |
