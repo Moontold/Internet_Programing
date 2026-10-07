@@ -111,3 +111,244 @@ body {
 .data-card table {
   margin: 0;
 }
+
+.first-upper::first-letter {
+  text-transform: uppercase;
+}
+
+.child-card {
+  transition: border-color 120ms ease;
+}
+
+.child-card:hover {
+  border-color: var(--status-held);
+}
+
+.day-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.day-head__num {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+  min-width: 2.2ch;
+}
+
+.day-head__label {
+  color: var(--ink-muted);
+  font-size: 0.9375rem;
+}
+
+.day-head--today .day-head__num {
+  color: var(--accent);
+}
+
+.lesson-row {
+  display: grid;
+  grid-template-columns: 4px 64px 1fr auto;
+  gap: 14px;
+  align-items: center;
+  width: 100%;
+  padding: 12px 14px 12px 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  text-align: left;
+  color: inherit;
+  transition: border-color 120ms ease;
+}
+
+.lesson-row:hover {
+  border-color: var(--status-held);
+}
+
+.lesson-row__bar {
+  align-self: stretch;
+  background: var(--status-planned);
+}
+
+.lesson-row--held .lesson-row__bar {
+  background: var(--status-held);
+}
+
+.lesson-row--cancelled {
+  color: var(--ink-muted);
+}
+
+.lesson-row--cancelled .lesson-row__bar {
+  background: var(--status-cancelled);
+}
+
+.lesson-row--cancelled .lesson-row__time {
+  text-decoration: line-through;
+}
+
+.lesson-row__time {
+  font-weight: 600;
+  font-size: 1.0625rem;
+  line-height: 1.2;
+}
+
+.lesson-row__dur {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+  font-weight: 400;
+}
+
+.lesson-row__title {
+  font-weight: 600;
+}
+
+.lesson-row__meta {
+  font-size: 0.875rem;
+  color: var(--ink-muted);
+}
+
+.lesson-row__side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.lesson-row__side:empty {
+  display: none;
+}
+
+.grade-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  font-weight: 700;
+  font-size: 0.9375rem;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+
+.grade-mark--lg {
+  width: 44px;
+  height: 44px;
+  font-size: 1.25rem;
+}
+
+.alert-pill {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #fdf3e6;
+  color: var(--alert);
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+@media (max-width: 30em) {
+  .lesson-row {
+    grid-template-columns: 4px 56px 1fr;
+  }
+
+  .lesson-row__side {
+    grid-column: 2 / -1;
+    flex-direction: row;
+    justify-content: flex-start;
+  }
+}
+
+.fc {
+  --fc-border-color: var(--line);
+  --fc-today-bg-color: var(--today);
+  --fc-page-bg-color: var(--surface);
+  --fc-neutral-bg-color: var(--paper);
+  --fc-button-bg-color: var(--surface);
+  --fc-button-border-color: var(--line);
+  --fc-button-text-color: var(--ink);
+  --fc-button-hover-bg-color: var(--paper);
+  --fc-button-hover-border-color: var(--status-held);
+  --fc-button-active-bg-color: var(--accent-soft);
+  --fc-button-active-border-color: var(--accent);
+  --fc-now-indicator-color: var(--alert);
+  --fc-event-border-color: transparent;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.fc .fc-toolbar-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.fc .fc-toolbar-title::first-letter {
+  text-transform: uppercase;
+}
+
+.fc .fc-button {
+  font-weight: 600;
+  text-transform: none;
+  border-radius: 6px;
+  box-shadow: none !important;
+}
+
+.fc .fc-button-primary:not(:disabled).fc-button-active {
+  color: var(--accent);
+}
+
+.fc .fc-col-header-cell-cushion {
+  color: var(--ink-muted);
+  font-weight: 500;
+  text-decoration: none;
+  text-transform: capitalize;
+  padding: 8px 4px;
+}
+
+.fc .fc-day-today .fc-col-header-cell-cushion {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.fc .fc-timegrid-slot-label-cushion,
+.fc .fc-daygrid-day-number {
+  color: var(--ink-muted);
+  font-size: 0.8125rem;
+  text-decoration: none;
+}
+
+.fc .fc-event {
+  border-radius: 6px;
+  border-left: 3px solid rgba(0, 0, 0, 0.18);
+  padding: 2px 4px;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.fc .fc-event-main {
+  color: var(--ink);
+}
+
+.fc .fc-lesson--cancelled .fc-event-main {
+  color: var(--ink-muted);
+}
+
+.fc .fc-timegrid-event .fc-event-time {
+  font-weight: 600;
+}
+
+@media (max-width: 48em) {
+  .mantine-Notifications-root[data-position^='bottom'] {
+    bottom: calc(56px + var(--mantine-spacing-md)) !important;
+  }
+}
