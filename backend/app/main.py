@@ -9,7 +9,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.core.errors import AppError
 from app.database import async_session_maker
 from app.middleware import csrf_middleware
-from app.routers import auth, health, lessons, parents, series, students
+from app.routers import auth, cabinet, files, health, lessons, parents, series, students
 from app.services.auth_service import AuthService
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(name)s: %(message)s')
@@ -36,7 +36,7 @@ app.middleware('http')(csrf_middleware)
 @app.exception_handler(AppError)
 async def app_error_handler(_: Request, exc: AppError) -> JSONResponse:
     log.warning('AppError: %s', exc.message)
-    return JSONResponse(status_code=200, content={'error': True, 'message': exc.message, 'payload': None})
+    return JSONResponse(status_code=exc.status_code, content={'error': True, 'message': exc.message, 'payload': None})
 
 
 @app.exception_handler(StarletteHTTPException)
@@ -62,3 +62,5 @@ app.include_router(parents.router, prefix=API_PREFIX)
 app.include_router(students.router, prefix=API_PREFIX)
 app.include_router(series.router, prefix=API_PREFIX)
 app.include_router(lessons.router, prefix=API_PREFIX)
+app.include_router(files.router, prefix=API_PREFIX)
+app.include_router(cabinet.router, prefix=API_PREFIX)

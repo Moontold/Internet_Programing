@@ -6,7 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.core.errors import AppError
 from app.core.security import generate_temp_password, hash_password
+from app.core.stats import homework_stats
 from app.models import Role, Student, User
+from app.repositories.lesson_repository import LessonRepository
 from app.repositories.parent_repository import ParentRepository
 from app.repositories.series_repository import SeriesRepository
 from app.repositories.session_repository import SessionRepository
@@ -43,6 +45,7 @@ class StudentService:
         self._users = UserRepository(db=db)
         self._sessions = SessionRepository(db=db)
         self._series = SeriesRepository(db=db)
+        self._lessons = LessonRepository(db=db)
 
     async def _get_or_raise(self, student_id: int) -> Student:
         student = await self._students.get(student_id=student_id)
@@ -57,11 +60,13 @@ class StudentService:
     async def build_card(self, student: Student) -> schemas.Student:
         today = datetime.now(timezone.utc).astimezone(settings.tz).date()
         series = await self._series.list_active_for_student(student_id=student.id, today=today)
+        counts = await self._lessons.homework_counts(student_id=student.id)
         return schemas.Student(
             **to_student_list_item(student=student).model_dump(),
             login=student.user.login,
             price_per_lesson=student.price_per_lesson,
             series=[to_series_schema(series=item) for item in series],
+            stats=homework_stats(counts=counts),
         )
 
     async def list(self, is_active: Optional[bool]) -> schemas.StudentsList:

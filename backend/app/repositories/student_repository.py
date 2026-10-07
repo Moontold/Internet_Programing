@@ -22,6 +22,10 @@ class StudentRepository:
         result = await self._db.execute(self._base().where(Student.id == student_id))
         return result.scalar_one_or_none()
 
+    async def get_by_user_id(self, user_id: int) -> Optional[Student]:
+        result = await self._db.execute(self._base().where(Student.user_id == user_id))
+        return result.scalar_one_or_none()
+
     async def get_many(self, ids: list[int]) -> Sequence[Student]:
         if not ids:
             return []
@@ -32,6 +36,11 @@ class StudentRepository:
         stmt = self._base().order_by(User.full_name, Student.id)
         if is_active is not None:
             stmt = stmt.where(Student.is_active.is_(is_active))
+        result = await self._db.execute(stmt)
+        return result.scalars().all()
+
+    async def list_for_parent(self, parent_id: int) -> Sequence[Student]:
+        stmt = self._base().where(Student.parent_id == parent_id).order_by(User.full_name, Student.id)
         result = await self._db.execute(stmt)
         return result.scalars().all()
 

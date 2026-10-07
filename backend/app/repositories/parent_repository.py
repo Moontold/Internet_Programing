@@ -22,6 +22,10 @@ class ParentRepository:
         result = await self._db.execute(self._base().where(Parent.id == parent_id))
         return result.scalar_one_or_none()
 
+    async def get_by_user_id(self, user_id: int) -> Optional[Parent]:
+        result = await self._db.execute(self._base().where(Parent.user_id == user_id))
+        return result.scalar_one_or_none()
+
     async def list_all(self, is_active: Optional[bool] = None) -> Sequence[Parent]:
         stmt = self._base().order_by(User.full_name, Parent.id)
         if is_active is not None:

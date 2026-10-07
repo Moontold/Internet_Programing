@@ -69,8 +69,10 @@
 
 - `StudentCreate`: `{full_name, login, password, parent_id, grade?: 1..11, grade_note?, format: 'online' | 'offline', price_per_lesson?}`.
 - `StudentListItem`: `{id, full_name, grade, grade_note, format, is_active, parent: {id, full_name, phone}}`.
-- `Student` = `StudentListItem` + `{login, price_per_lesson, series: Series[]}`, где `series` —
-  действующие серии ученика (его регулярное расписание).
+- `Student` = `StudentListItem` + `{login, price_per_lesson, series: Series[], stats}`, где `series` —
+  действующие серии ученика (его регулярное расписание), `stats` —
+  `{homework_done_percent, homework_avg_grade}`: доля сделанных домашек среди проверенных
+  по проведённым занятиям и средняя оценка (`null`, если считать не из чего).
 
 Деактивированный ученик или родитель не может войти («Учётная запись отключена»);
 данные и история занятий остаются.
@@ -91,21 +93,47 @@
 
 ## 6. Занятия — `/api/lessons`
 
-Раздел репетитора. Удалённые занятия в выборки не попадают.
+Правка — раздел репетитора; карточку занятия открывают все роли (см. «Видимость по ролям»).
+Удалённые занятия в выборки не попадают.
 
 | Метод и путь | Тело → `payload` | Что делает |
 |---|---|---|
-| `GET /lessons?start=&end=&student_id=` | — → `{lessons: LessonShort[]}` | Занятия, начинающиеся в `[start, end)` (не больше года), по времени |
+| `GET /lessons?start=&end=&student_id=` | — → `{lessons: LessonShort[]}` | Календарь репетитора: занятия, начинающиеся в `[start, end)` (не больше года) |
 | `POST /lessons` | `{scheduled_start, duration_minutes, title?, student_ids}` → `Lesson` | Разовое занятие вне серии; `title` становится темой |
-| `GET /lessons/{id}` | — → `Lesson` | Занятие |
+| `GET /lessons/{id}` | — → `Lesson` | Карточка занятия; родитель и ученик получают только «своё» занятие, иначе «Нет доступа к этому занятию» |
 | `PATCH /lessons/{id}` | `LessonUpdate` → `Lesson` | Перенос, длительность, состав — с областью `scope`; тема — всегда только у этого занятия |
 | `POST /lessons/{id}/cancel` | `{scope: 'this' \| 'following'}` → `Lesson` | Отмена; проведённое тоже можно отменить |
 | `DELETE /lessons/{id}?scope=this\|following` | — → `null` | Удаление; проведённое удалить нельзя |
 
+| `PATCH /lessons/{id}/homework` | `{homework_text}` → `Lesson` | Сохранить текст домашнего задания |
+| `PATCH /lessons/{id}/students/{student_id}` | `{homework_status?, homework_grade?: 2..5, clear_grade?, price?}` → `Lesson` | Статус домашки, оценка и ставка участника |
+| `POST /lessons/{id}/files` | `multipart/form-data`, поле `file` → `FileInfo` | Прикрепить файл к домашке; не больше `MAX_UPLOAD_MB` |
+| `DELETE /lessons/{id}/files/{file_id}` | — → `null` | Открепить файл и удалить его из хранилища |
+
 - `LessonShort`: `{id, series_id, scheduled_start, duration_minutes, status: 'planned' | 'held' | 'cancelled',
-  detached, topic, title, participants: [{student_id, full_name, price}]}`; `title` — название серии.
-- `Lesson` = `LessonShort` + `{original_start}` — исходное место занятия в серии.
-- `LessonUpdate`: `{scope: 'this' | 'following' | 'all', scheduled_start?, duration_minutes?, student_ids?, topic?}`.
+  detached, topic, title, format, participants, homework_pending, has_homework}`; `title` — название
+  серии, `format` — `online` / `offline` по участникам (`null`, если форматы разные),
+  `has_homework` — есть текст или файлы домашки.
+- Участник: `{student_id, full_name, price, homework_status: 'not_checked' | 'done' | 'not_done', homework_grade}`.
+- `Lesson` = `LessonShort` + `{original_start, homework_text, homework_saved_at, parent_comment,
+  tutor_notes, files: FileInfo[], previous_grade}`; `previous_grade` — оценка за предыдущую
+  домашку, когда в занятии виден один ученик.
+- `FileInfo`: `{id, original_name, size, mime, created_at}`.
+- `LessonUpdate`: `{scope: 'this' | 'following' | 'all', scheduled_start?, duration_minutes?, student_ids?,
+  topic?, parent_comment?, tutor_notes?}`; тема, комментарий и заметки правятся только у этого занятия.
+- Отменённое занятие не редактируется: ни расписание, ни домашка, ни оценки, ни файлы.
+
+### Видимость по ролям
+
+| Поле | Репетитор | Родитель | Ученик |
+|---|---|---|---|
+| Занятие целиком | любое | если участвует его ребёнок | если участвует сам |
+| Свой участник: статус домашки, оценка | да | да | да |
+| Свой участник: ставка `price` | да | да | нет |
+| Чужой участник группы | всё | только имя | только имя |
+| `parent_comment` | да | да | нет (`null`) |
+| `tutor_notes` | да | нет (`null`) | нет (`null`) |
+| `homework_pending` | всегда `false` | проведено, а домашка его ребёнка не отмечена сделанной | то же для себя |
 
 ### Области правки
 
@@ -130,3 +158,26 @@
 | 1 минута | Запланированные занятия, время которых закончилось, становятся проведёнными |
 | 1 час | Действующие серии дополняются занятиями до горизонта; удалённые не порождаются заново |
 | 1 сутки | Удаляются истёкшие сессии и записи о попытках входа старше суток |
+
+## 7. Файлы — `/api/files`
+
+| Метод и путь | Кто | Что делает |
+|---|---|---|
+| `GET /files/{id}?inline=` | вошедший | Скачать файл домашки |
+
+Файл отдаётся репетитору, участнику занятия и его родителю; остальным — `403`, удалённый
+или несуществующий файл — `404` (тело — тот же конверт). Ответ — сами байты с
+`Content-Disposition: attachment` и исходным именем файла. `inline=true` открывает в браузере
+только безопасные типы (PDF, PNG, JPEG, GIF, WebP, текст); остальное всегда скачивается.
+Файлы лежат в томе `uploads`, в БД — только описание.
+
+## 8. Кабинеты родителя и ученика
+
+| Метод и путь | Кто | `payload` | Что делает |
+|---|---|---|---|
+| `GET /parent/children` | родитель | `{children: [{student, series, stats}]}` | Дети с регулярным расписанием и статистикой домашек |
+| `GET /parent/children/{student_id}/lessons?start=&end=` | родитель | `{lessons: LessonShort[]}` | Занятия своего ребёнка за период; чужой ребёнок — «Нет доступа к этому ученику» |
+| `GET /student/lessons?start=&end=` | ученик | `{lessons: LessonShort[]}` | Свои занятия с домашками, оценками и плашкой `homework_pending` |
+| `GET /student/series` | ученик | `{series: Series[]}` | Своё регулярное расписание |
+
+Карточку занятия из кабинета открывают через `GET /lessons/{id}`, файлы — через `GET /files/{id}`.

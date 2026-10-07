@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     app_timezone: str = 'Europe/Moscow'
     session_days: int = 30
     schedule_horizon_weeks: int = Field(default=12, ge=1, le=52)
+    upload_dir: str = '/data/uploads'
+    # Должен совпадать с client_max_body_size в frontend/nginx.conf
+    max_upload_mb: int = Field(default=50, ge=1)
 
     @property
     def database_url(self) -> str:

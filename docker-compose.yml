@@ -20,6 +20,8 @@ services:
     env_file: .env
     environment:
       DB_HOST: postgres
+    volumes:
+      - uploads:/data/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -52,3 +54,4 @@ services:
 
 volumes:
   pgdata:
+  uploads:

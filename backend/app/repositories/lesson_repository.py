@@ -1,11 +1,12 @@
 from datetime import datetime
 from typing import Optional, Sequence
 
-from sqlalchemy import Select, select
+from sqlalchemy import Select, case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models import Lesson, LessonSeries, LessonStatus, LessonStudent, Student
+from app.core.stats import HomeworkCounts
+from app.models import HomeworkStatus, Lesson, LessonSeries, LessonStatus, LessonStudent, Student, lesson_files
 
 
 class LessonRepository:
@@ -16,6 +17,7 @@ class LessonRepository:
     def _with_participants() -> Select:
         return select(Lesson).options(
             selectinload(Lesson.participants).selectinload(LessonStudent.student).selectinload(Student.user),
+            selectinload(Lesson.files),
         )
 
     def _base(self) -> Select:
@@ -87,6 +89,64 @@ class LessonRepository:
             )
         result = await self._db.execute(stmt.order_by(Lesson.scheduled_start))
         return result.scalars().unique().all()
+
+    async def list_for_students(self, student_ids: list[int], start: datetime, end: datetime) -> Sequence[Lesson]:
+        if not student_ids:
+            return []
+        stmt = (
+            self._base()
+            .join(LessonStudent, LessonStudent.lesson_id == Lesson.id)
+            .where(
+                LessonStudent.student_id.in_(student_ids),
+                Lesson.scheduled_start >= start,
+                Lesson.scheduled_start < end,
+            )
+            .order_by(Lesson.scheduled_start)
+        )
+        result = await self._db.execute(stmt)
+        return result.scalars().unique().all()
+
+    async def get_by_file_id(self, file_id: int) -> Optional[Lesson]:
+        stmt = self._base().join(lesson_files, lesson_files.c.lesson_id == Lesson.id).where(
+            lesson_files.c.file_id == file_id
+        )
+        result = await self._db.execute(stmt)
+        return result.scalars().first()
+
+    async def homework_counts(self, student_id: int) -> HomeworkCounts:
+        """Сделано, не сделано и средняя оценка по проведённым занятиям ученика."""
+        stmt = (
+            select(
+                func.coalesce(func.sum(case((LessonStudent.homework_status == HomeworkStatus.DONE, 1), else_=0)), 0),
+                func.coalesce(func.sum(case((LessonStudent.homework_status == HomeworkStatus.NOT_DONE, 1), else_=0)), 0),
+                func.avg(LessonStudent.homework_grade),
+            )
+            .select_from(LessonStudent)
+            .join(Lesson, Lesson.id == LessonStudent.lesson_id)
+            .where(
+                LessonStudent.student_id == student_id,
+                Lesson.status == LessonStatus.HELD,
+                Lesson.deleted_at.is_(None),
+            )
+        )
+        done, not_done, avg = (await self._db.execute(stmt)).one()
+        return HomeworkCounts(done=int(done), not_done=int(not_done), avg_grade=float(avg) if avg is not None else None)
+
+    async def previous_grade(self, student_id: int, before: datetime) -> Optional[int]:
+        """Оценка ученика за последнее проведённое занятие до before."""
+        stmt = (
+            select(LessonStudent.homework_grade)
+            .join(Lesson, Lesson.id == LessonStudent.lesson_id)
+            .where(
+                LessonStudent.student_id == student_id,
+                Lesson.status == LessonStatus.HELD,
+                Lesson.deleted_at.is_(None),
+                Lesson.scheduled_start < before,
+            )
+            .order_by(Lesson.scheduled_start.desc())
+            .limit(1)
+        )
+        return (await self._db.execute(stmt)).scalar_one_or_none()
 
     async def series_titles(self, series_ids: list[int]) -> dict[int, str]:
         if not series_ids:

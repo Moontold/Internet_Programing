@@ -9,6 +9,13 @@ from app.schemas.series import Series
 Format = Literal['offline', 'online']
 
 
+class StudentStats(BaseModel):
+    homework_done_percent: Optional[int] = Field(
+        default=None, description='Доля сделанных домашек по проведённым занятиям, %; null — оценивать нечего'
+    )
+    homework_avg_grade: Optional[float] = Field(default=None, description='Средняя оценка; null — оценок нет')
+
+
 class StudentShort(BaseModel):
     id: int = Field(..., description='ID ученика')
     full_name: str = Field(..., description='ФИО')
@@ -26,6 +33,7 @@ class Student(StudentListItem):
     login: str = Field(..., description='Логин')
     price_per_lesson: int = Field(..., description='Ставка за занятие, руб.')
     series: list[Series] = Field(default_factory=list, description='Действующие серии: регулярное расписание')
+    stats: StudentStats = Field(default_factory=StudentStats, description='Статистика домашних заданий')
 
 
 class StudentsList(BaseModel):
