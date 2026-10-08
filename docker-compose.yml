@@ -20,8 +20,28 @@ services:
     env_file: .env
     environment:
       DB_HOST: postgres
+    volumes:
+      - uploads:/data/uploads
     depends_on:
       postgres:
+        condition: service_healthy
+    # Готов, когда применены миграции и поднят API: на это ориентируется worker
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/ping')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  worker:
+    build: ./backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DB_HOST: postgres
+    command: ["python", "-m", "app.worker.main"]
+    depends_on:
+      backend:
         condition: service_healthy
 
   frontend:
@@ -34,3 +54,4 @@ services:
 
 volumes:
   pgdata:
+  uploads:
