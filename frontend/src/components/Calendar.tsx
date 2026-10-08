@@ -1,4 +1,4 @@
-import type { DatesSetArg, EventClickArg, EventDropArg, EventMountArg } from '@fullcalendar/core';
+import type { DatesSetArg, EventClickArg, EventContentArg, EventDropArg, EventMountArg } from '@fullcalendar/core';
 import ruLocale from '@fullcalendar/core/locales/ru';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin, { type DateClickArg } from '@fullcalendar/interaction';
@@ -22,26 +22,32 @@ const EVENT_COLORS: Record<LessonShort['status'], string> = {
   cancelled: '#f5f6f8',
 };
 
-const eventTitle = (lesson: LessonShort) =>
-  [lesson.title || lesson.participants.map((p) => p.full_name.split(' ')[0]).join(', '), lesson.topic]
-    .filter(Boolean)
-    .join(' · ');
-
 const eventEnd = (lesson: LessonShort) =>
   new Date(new Date(lesson.scheduled_start).getTime() + lesson.duration_minutes * 60000).toISOString();
 
 export function Calendar({ lessons, onRangeChange, onOpen, onMove, onCreate, onContextMenu }: Props) {
-  const byId = new Map(lessons.map((item) => [String(item.id), item]));
-  const events = lessons.map((lesson) => ({
+  const shown = lessons.filter((item) => item.status !== 'cancelled');
+  const byId = new Map(shown.map((item) => [String(item.id), item]));
+  const events = shown.map((lesson) => ({
     id: String(lesson.id),
-    title: eventTitle(lesson),
+    title: [lesson.title, lesson.topic].filter(Boolean).join(' · '),
     start: lesson.scheduled_start,
     end: eventEnd(lesson),
     backgroundColor: EVENT_COLORS[lesson.status],
     borderColor: EVENT_COLORS[lesson.status],
-    classNames: [`fc-lesson--${lesson.status}`],
     editable: lesson.status === 'planned',
   }));
+
+  const renderEvent = (arg: EventContentArg) => {
+    const names = (byId.get(arg.event.id)?.participants ?? []).map((item) => item.full_name).join(', ');
+    return (
+      <div className="fc-lesson">
+        <div className="fc-lesson__time">{arg.timeText}</div>
+        {arg.event.title && <div className="fc-lesson__title">{arg.event.title}</div>}
+        {names && <div className="fc-lesson__names">{names}</div>}
+      </div>
+    );
+  };
 
   return (
     <FullCalendar
@@ -58,6 +64,9 @@ export function Calendar({ lessons, onRangeChange, onOpen, onMove, onCreate, onC
       events={events}
       editable
       eventDurationEditable={false}
+      eventLongPressDelay={300}
+      longPressDelay={300}
+      eventContent={renderEvent}
       eventTimeFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
       slotLabelFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
       defaultRangeSeparator=" – "
