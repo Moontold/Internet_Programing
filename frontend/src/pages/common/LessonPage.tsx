@@ -23,6 +23,14 @@ const metaLine = (lesson: Lesson) =>
     .filter(Boolean)
     .join(' · ');
 
+function useDraft(saved: string | null | undefined) {
+  const [draft, setDraft] = useState(saved ?? '');
+  useEffect(() => {
+    if (saved !== undefined && saved !== null) setDraft(saved);
+  }, [saved]);
+  return [draft, setDraft] as const;
+}
+
 export function LessonPage() {
   const lessonId = Number(useParams().lessonId);
   const { user } = useAuth();
@@ -32,15 +40,11 @@ export function LessonPage() {
   const saveHomework = useSaveHomework(lessonId);
   const isTutor = user?.role === 'tutor';
 
-  const [topic, setTopic] = useState('');
-  const [homework, setHomework] = useState('');
+  const [topic, setTopic] = useDraft(lesson.data?.topic);
+  const [homework, setHomework] = useDraft(lesson.data?.homework_text);
+  const [comment, setComment] = useDraft(lesson.data?.parent_comment);
+  const [notes, setNotes] = useDraft(lesson.data?.tutor_notes);
   const [moveOpen, setMoveOpen] = useState(false);
-
-  useEffect(() => {
-    if (!lesson.data) return;
-    setTopic(lesson.data.topic);
-    setHomework(lesson.data.homework_text);
-  }, [lesson.data]);
 
   if (lesson.isError) return <Text c="dimmed">{lesson.error.message}</Text>;
   if (!lesson.data) return null;
@@ -160,6 +164,69 @@ export function LessonPage() {
         </Title>
         <HomeworkFiles lesson={data} canEdit={isTutor} />
       </Card>
+
+      {data.parent_comment !== null && (
+        <Card>
+          <Title order={4} mb="xs">
+            Комментарий для родителя
+          </Title>
+          {isTutor ? (
+            <Stack gap="xs">
+              <Textarea
+                aria-label="Комментарий для родителя"
+                value={comment}
+                onChange={(e) => setComment(e.currentTarget.value)}
+                autosize
+                minRows={2}
+                placeholder="Что стоит знать родителю об этом занятии"
+              />
+              <Group justify="flex-end">
+                <Button
+                  variant="default"
+                  disabled={comment === data.parent_comment}
+                  loading={update.isPending}
+                  onClick={() =>
+                    update.mutate({ parent_comment: comment }, { onSuccess: ok('Комментарий сохранён'), onError })
+                  }
+                >
+                  Сохранить
+                </Button>
+              </Group>
+            </Stack>
+          ) : (
+            <Text style={{ whiteSpace: 'pre-wrap' }} c={data.parent_comment ? undefined : 'dimmed'}>
+              {data.parent_comment || 'Комментария нет'}
+            </Text>
+          )}
+        </Card>
+      )}
+
+      {isTutor && data.tutor_notes !== null && (
+        <Card>
+          <Title order={4} mb="xs">
+            Заметки (видите только вы)
+          </Title>
+          <Stack gap="xs">
+            <Textarea
+              aria-label="Заметки репетитора"
+              value={notes}
+              onChange={(e) => setNotes(e.currentTarget.value)}
+              autosize
+              minRows={2}
+            />
+            <Group justify="flex-end">
+              <Button
+                variant="default"
+                disabled={notes === data.tutor_notes}
+                loading={update.isPending}
+                onClick={() => update.mutate({ tutor_notes: notes }, { onSuccess: ok('Заметки сохранены'), onError })}
+              >
+                Сохранить
+              </Button>
+            </Group>
+          </Stack>
+        </Card>
+      )}
 
       <MoveLessonModal lesson={moveOpen ? data : null} onClose={() => setMoveOpen(false)} />
     </Stack>

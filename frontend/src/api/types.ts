@@ -136,6 +136,8 @@ export interface Lesson extends LessonShort {
   original_start: string;
   homework_text: string;
   homework_saved_at: string | null;
+  parent_comment: string | null;
+  tutor_notes: string | null;
   files: FileInfo[];
   previous_grade: number | null;
 }
@@ -151,6 +153,8 @@ export interface LessonUpdate {
   duration_minutes?: number;
   student_ids?: number[];
   topic?: string;
+  parent_comment?: string;
+  tutor_notes?: string;
 }
 export interface ParticipantUpdate {
   homework_status?: HomeworkStatus;
