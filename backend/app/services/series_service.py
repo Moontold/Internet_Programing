@@ -238,7 +238,8 @@ class SeriesService:
         Строка самого занятия переезжает в новую серию и сохраняет содержимое. Последующие
         обычные запланированные удаляются и порождаются заново по новому правилу; отделённые,
         отменённые и удалённые переезжают со сдвигом и продолжают занимать своё место.
-        Проведённые остаются в старой серии.
+        Проведённые остаются в старой серии без изменений, в том числе само занятие,
+        если правка начата из проведённого.
         """
         old_series = await self._series_of(lesson=lesson)
         if student_ids is not None:
@@ -274,14 +275,15 @@ class SeriesService:
                 tz=settings.tz,
             )
 
-        lesson.series_id = new_series.id
-        lesson.original_start = first_start
-        if new_start is not None:
-            lesson.scheduled_start = new_start
-            lesson.detached = False
-        if duration_minutes is not None:
-            lesson.duration_minutes = duration_minutes
-        sync_participants(lesson=lesson, students=students)
+        if lesson.status != LessonStatus.HELD:
+            lesson.series_id = new_series.id
+            lesson.original_start = first_start
+            if new_start is not None:
+                lesson.scheduled_start = new_start
+                lesson.detached = False
+            if duration_minutes is not None:
+                lesson.duration_minutes = duration_minutes
+            sync_participants(lesson=lesson, students=students)
         await self._db.flush()
         # Только будущее: прошедшие места новой серии уже заняты проведёнными занятиями старой
         await self.generate(series=new_series, from_moment=datetime.now(timezone.utc))

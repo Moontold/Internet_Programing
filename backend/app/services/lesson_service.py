@@ -158,7 +158,10 @@ class LessonService:
         lesson.detached = True
 
     async def _apply_all(self, lesson: Lesson, data: schemas.LessonUpdate) -> None:
-        """«Все занятия»: перенос одного занятия двигает правило серии на ту же дельту."""
+        """«Все занятия»: перенос одного занятия двигает правило серии на ту же дельту.
+
+        Если правка начата из проведённого занятия, меняется только серия, само занятие остаётся как было.
+        """
         series = await self._series_service.get_or_raise(series_id=lesson.series_id)
         new_first: Optional[datetime] = None
         if data.scheduled_start is not None:
@@ -176,7 +179,10 @@ class LessonService:
                 student_ids=data.student_ids,
             ),
         )
-        # Отделённое или проведённое занятие apply_all не трогает, но репетитор правил именно его
+        # Проведённое не меняется правкой серии: его состав исправляется только с областью «только это»
+        if lesson.status == LessonStatus.HELD:
+            return
+        # Отделённое занятие apply_all не трогает, но репетитор правил именно его
         if data.scheduled_start is not None:
             lesson.scheduled_start = data.scheduled_start
         if data.duration_minutes is not None:
