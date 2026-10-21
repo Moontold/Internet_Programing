@@ -194,7 +194,8 @@ class LessonService:
         lesson = await self._get_or_raise(lesson_id=lesson_id)
         if lesson.status == LessonStatus.CANCELLED:
             raise AppError('Занятие уже отменено')
-        if scope == 'following':
+        # У разового занятия «это и последующие» равносильно «только это» — так же, как при удалении
+        if scope == 'following' and lesson.series_id is not None:
             await self._series_service.cancel_following(lesson=lesson)
         else:
             lesson.status = LessonStatus.CANCELLED
