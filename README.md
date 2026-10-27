@@ -15,7 +15,7 @@
 ## Запуск
 
 ```bash
-cp .env.example .env          # заполнить POSTGRES_PASSWORD
+cp .env.example .env          # заполнить POSTGRES_PASSWORD, TUTOR_LOGIN, TUTOR_PASSWORD
 docker compose up -d --build
 ```
 
@@ -25,6 +25,8 @@ docker compose up -d --build
 Требования к окружению, переменные окружения, локальная разработка без Docker,
 проверка работоспособности и частые проблемы —
 в [инструкции по запуску](./docs/Инструкция%20по%20запуску.md).
+Эндпоинты backend и правила обмена с фронтендом — в [справочнике API](./docs/API.md),
+живая документация — Swagger UI на `http://localhost/api/docs`.
 
 ## Состав команды
 
