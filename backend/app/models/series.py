@@ -28,6 +28,7 @@ class LessonSeries(Base):
     interval_weeks: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     until: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     title: Mapped[str] = mapped_column(String(200), nullable=False, default='')
+    color: Mapped[Optional[str]] = mapped_column(String(7), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     students: Mapped[list['Student']] = relationship(secondary=series_students, lazy='selectin', order_by='Student.id')

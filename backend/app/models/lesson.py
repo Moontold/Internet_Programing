@@ -32,6 +32,7 @@ class Lesson(Base):
     duration_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default='planned', index=True)
     detached: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    color: Mapped[Optional[str]] = mapped_column(String(7), nullable=True)  # свой цвет; null — цвет серии
     topic: Mapped[str] = mapped_column(String(300), nullable=False, default='')
     homework_text: Mapped[str] = mapped_column(Text, nullable=False, default='')
     homework_saved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
