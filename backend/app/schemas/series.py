@@ -18,6 +18,7 @@ class Series(BaseModel):
     interval_weeks: int = Field(..., description='Повтор каждые N недель')
     until: Optional[date] = Field(default=None, description='Последняя дата включительно; null — бессрочно')
     title: str = Field(default='', description='Название серии')
+    color: Optional[str] = Field(default=None, description='Цвет занятий серии #rrggbb; null — без цвета')
     students: list[SeriesStudent] = Field(default_factory=list, description='Ученики серии')
 
 

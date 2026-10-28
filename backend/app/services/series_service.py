@@ -29,6 +29,7 @@ def to_series_schema(series: LessonSeries) -> schemas.Series:
         interval_weeks=series.interval_weeks,
         until=series.until,
         title=series.title,
+        color=series.color,
         students=[schemas.SeriesStudent(id=item.id, full_name=item.user.full_name) for item in series.students],
     )
 
@@ -255,6 +256,7 @@ class SeriesService:
             interval_weeks=old_series.interval_weeks,
             until=old_series.until,
             title=old_series.title,
+            color=old_series.color,
         )
         new_series.students = students
         await self._series.add(series=new_series)
