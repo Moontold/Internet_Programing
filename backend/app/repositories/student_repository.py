@@ -1,0 +1,50 @@
+from typing import Optional, Sequence
+
+from sqlalchemy import Select, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.models import Parent, Student, User
+
+
+class StudentRepository:
+    def __init__(self, db: AsyncSession) -> None:
+        self._db = db
+
+    def _base(self) -> Select:
+        return (
+            select(Student)
+            .join(User, User.id == Student.user_id)
+            .options(selectinload(Student.parent).selectinload(Parent.user))
+        )
+
+    async def get(self, student_id: int) -> Optional[Student]:
+        result = await self._db.execute(self._base().where(Student.id == student_id))
+        return result.scalar_one_or_none()
+
+    async def get_by_user_id(self, user_id: int) -> Optional[Student]:
+        result = await self._db.execute(self._base().where(Student.user_id == user_id))
+        return result.scalar_one_or_none()
+
+    async def get_many(self, ids: list[int]) -> Sequence[Student]:
+        if not ids:
+            return []
+        result = await self._db.execute(self._base().where(Student.id.in_(ids)))
+        return result.scalars().all()
+
+    async def list_all(self, is_active: Optional[bool] = None) -> Sequence[Student]:
+        stmt = self._base().order_by(User.full_name, Student.id)
+        if is_active is not None:
+            stmt = stmt.where(Student.is_active.is_(is_active))
+        result = await self._db.execute(stmt)
+        return result.scalars().all()
+
+    async def list_for_parent(self, parent_id: int) -> Sequence[Student]:
+        stmt = self._base().where(Student.parent_id == parent_id).order_by(User.full_name, Student.id)
+        result = await self._db.execute(stmt)
+        return result.scalars().all()
+
+    async def add(self, student: Student) -> Student:
+        self._db.add(student)
+        await self._db.flush()
+        return student
