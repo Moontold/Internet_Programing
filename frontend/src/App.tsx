@@ -1,65 +1,37 @@
-import { Alert, Badge, Card, Container, Group, Loader, Stack, Text, Title } from '@mantine/core';
-import { useEffect, useState } from 'react';
+import { Navigate, Route, Routes } from 'react-router-dom';
 
-import { fetchHealth, type HealthStatus } from './api/client';
+import { homeFor, useAuth } from './auth/AuthContext';
+import { RequireRole } from './auth/RequireRole';
+import { AppShell } from './components/AppShell';
+import { SectionPlaceholder } from './components/SectionPlaceholder';
+import { LoginPage } from './pages/common/LoginPage';
 
-type State =
-  | { kind: 'loading' }
-  | { kind: 'ready'; health: HealthStatus }
-  | { kind: 'failed'; message: string };
+function Home() {
+  const { user } = useAuth();
+  return <Navigate to={user ? homeFor(user.role) : '/login'} replace />;
+}
 
 export function App() {
-  const [state, setState] = useState<State>({ kind: 'loading' });
-
-  useEffect(() => {
-    fetchHealth()
-      .then((health) => setState({ kind: 'ready', health }))
-      .catch((error: Error) => setState({ kind: 'failed', message: error.message }));
-  }, []);
-
   return (
-    <Container size="sm" py="xl">
-      <Stack gap="md">
-        <Title order={1}>Сайт репетитора</Title>
-        <Text c="dimmed">
-          Базовый проект первого спринта: каркас стека и проверка связности
-          фронтенда, backend и базы данных.
-        </Text>
-
-        <Card withBorder radius="md" padding="lg">
-          {state.kind === 'loading' && (
-            <Group gap="sm">
-              <Loader size="sm" />
-              <Text>Проверяем backend…</Text>
-            </Group>
-          )}
-
-          {state.kind === 'failed' && (
-            <Alert color="red" title="Backend недоступен">
-              {state.message}
-            </Alert>
-          )}
-
-          {state.kind === 'ready' && (
-            <Stack gap="xs">
-              <Group justify="space-between">
-                <Text>Backend</Text>
-                <Badge color="green">ok, версия {state.health.version}</Badge>
-              </Group>
-              <Group justify="space-between">
-                <Text>База данных</Text>
-                <Badge color={state.health.database === 'ok' ? 'green' : 'red'}>
-                  {state.health.database}
-                </Badge>
-              </Group>
-              <Group justify="space-between">
-                <Text>Часовой пояс</Text>
-                <Badge variant="light">{state.health.timezone}</Badge>
-              </Group>
-            </Stack>
-          )}
-        </Card>
-      </Stack>
-    </Container>
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route element={<RequireRole roles={['tutor', 'parent', 'student']} />}>
+        <Route path="/" element={<Home />} />
+        <Route path="/profile" element={<AppShell><SectionPlaceholder title="Профиль" /></AppShell>} />
+      </Route>
+      <Route element={<RequireRole roles={['tutor']} />}>
+        <Route path="/schedule" element={<AppShell><SectionPlaceholder title="Расписание" /></AppShell>} />
+        <Route path="/students" element={<AppShell><SectionPlaceholder title="Ученики" /></AppShell>} />
+        <Route path="/parents" element={<AppShell><SectionPlaceholder title="Родители" /></AppShell>} />
+      </Route>
+      <Route element={<RequireRole roles={['parent']} />}>
+        <Route path="/children" element={<AppShell><SectionPlaceholder title="Дети" /></AppShell>} />
+      </Route>
+      <Route element={<RequireRole roles={['student']} />}>
+        <Route path="/my/schedule" element={<AppShell><SectionPlaceholder title="Расписание" /></AppShell>} />
+        <Route path="/my/lessons" element={<AppShell><SectionPlaceholder title="Занятия" /></AppShell>} />
+      </Route>
+      <Route path="*" element={<Home />} />
+    </Routes>
   );
 }
