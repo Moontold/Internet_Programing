@@ -5,6 +5,7 @@ from sqlalchemy import Select, case, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.finance import Charge
 from app.core.stats import HomeworkCounts
 from app.models import HomeworkStatus, Lesson, LessonSeries, LessonStatus, LessonStudent, Student, lesson_files
 
@@ -136,6 +137,29 @@ class LessonRepository:
         )
         done, not_done, avg = (await self._db.execute(stmt)).one()
         return HomeworkCounts(done=int(done), not_done=int(not_done), avg_grade=float(avg) if avg is not None else None)
+
+    @staticmethod
+    def _charges_stmt() -> Select:
+        """Начисления: участия в проведённых неудалённых занятиях."""
+        return (
+            select(LessonStudent.lesson_id, LessonStudent.student_id, Lesson.scheduled_start, LessonStudent.price)
+            .join(Lesson, Lesson.id == LessonStudent.lesson_id)
+            .where(Lesson.status == LessonStatus.HELD, Lesson.deleted_at.is_(None))
+        )
+
+    @staticmethod
+    def _to_charges(rows: Sequence) -> list[Charge]:
+        return [Charge(lesson_id=row[0], student_id=row[1], held_at=row[2], price=row[3]) for row in rows]
+
+    async def held_charges(self, student_ids: list[int]) -> list[Charge]:
+        if not student_ids:
+            return []
+        stmt = self._charges_stmt().where(LessonStudent.student_id.in_(student_ids))
+        return self._to_charges((await self._db.execute(stmt)).all())
+
+    async def held_charges_between(self, start: datetime, end: datetime) -> list[Charge]:
+        stmt = self._charges_stmt().where(Lesson.scheduled_start >= start, Lesson.scheduled_start < end)
+        return self._to_charges((await self._db.execute(stmt)).all())
 
     async def previous_grade(self, student_id: int, before: datetime) -> Optional[int]:
         """Оценка ученика за последнее проведённое занятие до before."""

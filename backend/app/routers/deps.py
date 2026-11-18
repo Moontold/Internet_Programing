@@ -9,6 +9,7 @@ from app.models import Role, User
 from app.services.auth_service import AuthService
 from app.services.cabinet_service import CabinetService
 from app.services.file_service import FileService
+from app.services.finance_service import FinanceService
 from app.services.lesson_service import LessonService
 from app.services.parent_service import ParentService
 from app.services.series_service import SeriesService
@@ -67,6 +68,10 @@ def get_lesson_service(db: AsyncSession = Depends(get_session)) -> LessonService
 
 def get_file_service(db: AsyncSession = Depends(get_session)) -> FileService:
     return FileService(db=db)
+
+
+def get_finance_service(db: AsyncSession = Depends(get_session)) -> FinanceService:
+    return FinanceService(db=db)
 
 
 def get_cabinet_service(db: AsyncSession = Depends(get_session)) -> CabinetService:

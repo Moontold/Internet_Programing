@@ -9,13 +9,14 @@ from app.repositories.parent_repository import ParentRepository
 from app.repositories.session_repository import SessionRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas import parent as schemas
+from app.services.finance_service import FinanceService
 
 
 def to_parent_short(parent: Parent) -> schemas.ParentShort:
     return schemas.ParentShort(id=parent.id, full_name=parent.user.full_name, phone=parent.phone)
 
 
-def to_parent_schema(parent: Parent) -> schemas.Parent:
+def to_parent_schema(parent: Parent, balance: int = 0) -> schemas.Parent:
     return schemas.Parent(
         id=parent.id,
         full_name=parent.user.full_name,
@@ -32,6 +33,8 @@ def to_parent_schema(parent: Parent) -> schemas.Parent:
             )
             for child in parent.children
         ],
+        balance=balance,
+        debt=max(0, -balance),
     )
 
 
@@ -41,6 +44,11 @@ class ParentService:
         self._parents = ParentRepository(db=db)
         self._users = UserRepository(db=db)
         self._sessions = SessionRepository(db=db)
+        self._finance = FinanceService(db=db)
+
+    async def _with_balance(self, parent: Parent) -> schemas.Parent:
+        account = await self._finance.account_for_parent(parent_id=parent.id)
+        return to_parent_schema(parent=parent, balance=account.balance)
 
     async def _get_or_raise(self, parent_id: int) -> Parent:
         parent = await self._parents.get(parent_id=parent_id)
@@ -50,10 +58,10 @@ class ParentService:
 
     async def list(self, is_active: Optional[bool]) -> schemas.ParentsList:
         parents = await self._parents.list_all(is_active=is_active)
-        return schemas.ParentsList(parents=[to_parent_schema(parent=item) for item in parents])
+        return schemas.ParentsList(parents=[await self._with_balance(parent=item) for item in parents])
 
     async def get(self, parent_id: int) -> schemas.Parent:
-        return to_parent_schema(parent=await self._get_or_raise(parent_id=parent_id))
+        return await self._with_balance(parent=await self._get_or_raise(parent_id=parent_id))
 
     async def create(self, data: schemas.ParentCreate) -> schemas.ParentCreated:
         if await self._users.login_exists(login=data.login):
@@ -88,7 +96,7 @@ class ParentService:
             if not data.is_active:
                 await self._sessions.delete_for_user(user_id=parent.user_id)
         await self._db.commit()
-        return to_parent_schema(parent=parent)
+        return await self._with_balance(parent=parent)
 
     async def reset_password(self, parent_id: int) -> str:
         """Генерирует новый пароль и завершает все сессии родителя."""
