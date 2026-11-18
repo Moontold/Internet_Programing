@@ -69,7 +69,8 @@ def visible_student_ids(lesson: Lesson, access: Access) -> list[int]:
     return [item.student_id for item in lesson.participants if access.can_see(student_id=item.student_id)]
 
 
-def project_short(lesson: Lesson, access: Access, title: str) -> schemas.LessonShort:
+def project_short(lesson: Lesson, access: Access, title: str, series_color: Optional[str]) -> schemas.LessonShort:
+    """series_color — цвет серии: занятие без своего цвета наследует его."""
     return schemas.LessonShort(
         id=lesson.id,
         series_id=lesson.series_id,
@@ -77,6 +78,8 @@ def project_short(lesson: Lesson, access: Access, title: str) -> schemas.LessonS
         duration_minutes=lesson.duration_minutes,
         status=lesson.status,
         detached=lesson.detached,
+        color=lesson.color or series_color,
+        own_color=lesson.color is not None,
         topic=lesson.topic,
         title=title,
         format=_common_format(lesson=lesson),
@@ -86,9 +89,15 @@ def project_short(lesson: Lesson, access: Access, title: str) -> schemas.LessonS
     )
 
 
-def project_full(lesson: Lesson, access: Access, title: str, previous_grade: Optional[int]) -> schemas.Lesson:
+def project_full(
+    lesson: Lesson,
+    access: Access,
+    title: str,
+    series_color: Optional[str],
+    previous_grade: Optional[int],
+) -> schemas.Lesson:
     return schemas.Lesson(
-        **project_short(lesson=lesson, access=access, title=title).model_dump(),
+        **project_short(lesson=lesson, access=access, title=title, series_color=series_color).model_dump(),
         original_start=lesson.original_start,
         homework_text=lesson.homework_text,
         homework_saved_at=lesson.homework_saved_at,

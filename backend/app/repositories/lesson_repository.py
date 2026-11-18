@@ -1,12 +1,17 @@
 from datetime import datetime
-from typing import Optional, Sequence
+from typing import NamedTuple, Optional, Sequence
 
-from sqlalchemy import Select, case, func, select
+from sqlalchemy import Select, case, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.stats import HomeworkCounts
 from app.models import HomeworkStatus, Lesson, LessonSeries, LessonStatus, LessonStudent, Student, lesson_files
+
+
+class SeriesLabel(NamedTuple):
+    title: str
+    color: Optional[str]
 
 
 class LessonRepository:
@@ -148,10 +153,15 @@ class LessonRepository:
         )
         return (await self._db.execute(stmt)).scalar_one_or_none()
 
-    async def series_titles(self, series_ids: list[int]) -> dict[int, str]:
+    async def series_labels(self, series_ids: list[int]) -> dict[int, SeriesLabel]:
+        """Название и цвет серий одним запросом: их показывает каждое занятие серии."""
         if not series_ids:
             return {}
         result = await self._db.execute(
-            select(LessonSeries.id, LessonSeries.title).where(LessonSeries.id.in_(series_ids))
+            select(LessonSeries.id, LessonSeries.title, LessonSeries.color).where(LessonSeries.id.in_(series_ids))
         )
-        return {row.id: row.title for row in result.all()}
+        return {row.id: SeriesLabel(title=row.title, color=row.color) for row in result.all()}
+
+    async def reset_color_in_series(self, series_id: int) -> None:
+        """Снимает свой цвет у всех занятий серии, чтобы они взяли цвет серии."""
+        await self._db.execute(update(Lesson).where(Lesson.series_id == series_id).values(color=None))
