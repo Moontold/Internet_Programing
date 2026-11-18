@@ -11,6 +11,7 @@ from app.services.cabinet_service import CabinetService
 from app.services.file_service import FileService
 from app.services.finance_service import FinanceService
 from app.services.lesson_service import LessonService
+from app.services.notification_service import NotificationService
 from app.services.parent_service import ParentService
 from app.services.series_service import SeriesService
 from app.services.student_service import StudentService
@@ -72,6 +73,10 @@ def get_file_service(db: AsyncSession = Depends(get_session)) -> FileService:
 
 def get_finance_service(db: AsyncSession = Depends(get_session)) -> FinanceService:
     return FinanceService(db=db)
+
+
+def get_notification_service(db: AsyncSession = Depends(get_session)) -> NotificationService:
+    return NotificationService(db=db)
 
 
 def get_cabinet_service(db: AsyncSession = Depends(get_session)) -> CabinetService:

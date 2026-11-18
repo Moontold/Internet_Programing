@@ -2,11 +2,13 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends
 
-from app.routers.deps import get_finance_service, get_parent_service, require_tutor
+from app.routers.deps import get_finance_service, get_notification_service, get_parent_service, require_tutor
 from app.schemas.auth import PasswordPayload, PasswordResponse
+from app.schemas.base import OkResponse
 from app.schemas.finance import ParentFinanceResponse, PaymentCreate, PaymentResponse
 from app.schemas.parent import ParentCreate, ParentCreatedResponse, ParentResponse, ParentsResponse, ParentUpdate
 from app.services.finance_service import FinanceService
+from app.services.notification_service import NotificationService
 from app.services.parent_service import ParentService
 
 router = APIRouter(prefix='/parents', tags=['parents'], dependencies=[Depends(require_tutor)])
@@ -66,3 +68,12 @@ async def add_payment(
     service: FinanceService = Depends(get_finance_service),
 ) -> PaymentResponse:
     return PaymentResponse(payload=await service.add_payment(parent_id=parent_id, data=body))
+
+
+@router.post('/{parent_id}/remind-payment', response_model=OkResponse, summary='Напомнить родителю об оплате')
+async def remind_payment(
+    parent_id: int,
+    service: NotificationService = Depends(get_notification_service),
+) -> OkResponse:
+    await service.remind_payment(parent_id=parent_id)
+    return OkResponse()
