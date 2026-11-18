@@ -10,6 +10,7 @@ import { useCreateSeries } from '../../api/series';
 import { useStudents } from '../../api/students';
 import type { LessonShort } from '../../api/types';
 import { Calendar } from '../../components/Calendar';
+import { LessonColorModal } from '../../components/LessonColorModal';
 import { LessonContextMenu, type MenuTarget } from '../../components/LessonContextMenu';
 import { LessonForm } from '../../components/LessonForm';
 import { LessonList } from '../../components/LessonList';
@@ -39,6 +40,7 @@ export function SchedulePage() {
   const [createAt, setCreateAt] = useState<Date | null>(null);
   const [menu, setMenu] = useState<MenuTarget | null>(null);
   const [movingTo, setMovingTo] = useState<LessonShort | null>(null);
+  const [coloring, setColoring] = useState<LessonShort | null>(null);
 
   const onError = (error: Error) => notifications.show({ color: 'red', message: error.message });
   const openLesson = (id: number) => navigate(`/lessons/${id}`);
@@ -106,8 +108,10 @@ export function SchedulePage() {
         onClose={() => setMenu(null)}
         onOpen={(lesson) => openLesson(lesson.id)}
         onMove={setMovingTo}
+        onColor={setColoring}
       />
       <MoveLessonModal lesson={movingTo} onClose={() => setMovingTo(null)} />
+      <LessonColorModal lesson={coloring} onClose={() => setColoring(null)} />
 
       <Modal opened={createAt !== null} onClose={() => setCreateAt(null)} title="Новое занятие">
         {createAt && (

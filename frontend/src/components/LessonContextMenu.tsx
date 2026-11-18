@@ -18,6 +18,7 @@ interface Props {
   onClose: () => void;
   onOpen: (lesson: LessonShort) => void;
   onMove: (lesson: LessonShort) => void;
+  onColor: (lesson: LessonShort) => void;
 }
 
 function confirmDelete(lesson: LessonShort, scope: Scope): Promise<boolean> {
@@ -40,7 +41,7 @@ function confirmDelete(lesson: LessonShort, scope: Scope): Promise<boolean> {
   });
 }
 
-export function LessonContextMenu({ target, onClose, onOpen, onMove }: Props) {
+export function LessonContextMenu({ target, onClose, onOpen, onMove, onColor }: Props) {
   const lesson = target?.lesson ?? null;
   const cancel = useCancelLesson();
   const remove = useDeleteLesson();
@@ -49,7 +50,7 @@ export function LessonContextMenu({ target, onClose, onOpen, onMove }: Props) {
   const doCancel = async () => {
     if (!lesson) return;
     const scope = await askCancelScope(lesson, 'Отменить занятие');
-    if (!scope || scope === 'all') return;
+    if (!scope) return;
     cancel.mutate(
       { id: lesson.id, scope },
       { onSuccess: () => notifications.show({ color: 'green', message: 'Занятие отменено' }), onError },
@@ -59,7 +60,7 @@ export function LessonContextMenu({ target, onClose, onOpen, onMove }: Props) {
   const doDelete = async () => {
     if (!lesson) return;
     const scope = await askCancelScope(lesson, 'Удалить занятие');
-    if (!scope || scope === 'all') return;
+    if (!scope) return;
     if (!(await confirmDelete(lesson, scope))) return;
     remove.mutate(
       { id: lesson.id, scope },
@@ -85,8 +86,13 @@ export function LessonContextMenu({ target, onClose, onOpen, onMove }: Props) {
         <Menu.Dropdown>
           <Menu.Label>{fmtDateTime(lesson.scheduled_start)}</Menu.Label>
           <Menu.Item onClick={() => onOpen(lesson)}>Открыть</Menu.Item>
-          {lesson.status === 'planned' && <Menu.Item onClick={() => onMove(lesson)}>Перенести…</Menu.Item>}
-          {lesson.status !== 'cancelled' && <Menu.Item onClick={doCancel}>Отменить</Menu.Item>}
+          {lesson.status !== 'cancelled' && (
+            <>
+              <Menu.Item onClick={() => onMove(lesson)}>Перенести…</Menu.Item>
+              <Menu.Item onClick={() => onColor(lesson)}>Цвет…</Menu.Item>
+              <Menu.Item onClick={doCancel}>Отменить</Menu.Item>
+            </>
+          )}
           {lesson.status !== 'held' && (
             <>
               <Menu.Divider />

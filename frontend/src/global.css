@@ -376,3 +376,25 @@ body {
     bottom: calc(56px + var(--mantine-spacing-md)) !important;
   }
 }
+
+.swatch {
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.swatch--none {
+  background: var(--surface);
+  background-image: linear-gradient(
+    to top right,
+    transparent calc(50% - 1px),
+    var(--status-cancelled) 50%,
+    transparent calc(50% + 1px)
+  );
+}
+
+.swatch--picked {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}

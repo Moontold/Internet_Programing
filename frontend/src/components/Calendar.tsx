@@ -6,6 +6,7 @@ import FullCalendar from '@fullcalendar/react';
 import timeGridPlugin from '@fullcalendar/timegrid';
 
 import type { LessonShort } from '../api/types';
+import { mixWithWhite } from '../lib/colors';
 
 interface Props {
   lessons: LessonShort[];
@@ -16,11 +17,20 @@ interface Props {
   onContextMenu: (lesson: LessonShort, x: number, y: number) => void;
 }
 
-const EVENT_COLORS: Record<LessonShort['status'], string> = {
+const STATUS_COLORS: Record<LessonShort['status'], string> = {
   planned: '#cfe6e2',
   held: '#e9ebf0',
   cancelled: '#f5f6f8',
 };
+
+function eventColors(lesson: LessonShort): { backgroundColor: string; borderColor: string } {
+  if (!lesson.color) {
+    const statusColor = STATUS_COLORS[lesson.status];
+    return { backgroundColor: statusColor, borderColor: statusColor };
+  }
+  if (lesson.status === 'held') return { backgroundColor: mixWithWhite(lesson.color), borderColor: lesson.color };
+  return { backgroundColor: lesson.color, borderColor: lesson.color };
+}
 
 const eventEnd = (lesson: LessonShort) =>
   new Date(new Date(lesson.scheduled_start).getTime() + lesson.duration_minutes * 60000).toISOString();
@@ -33,8 +43,7 @@ export function Calendar({ lessons, onRangeChange, onOpen, onMove, onCreate, onC
     title: [lesson.title, lesson.topic].filter(Boolean).join(' · '),
     start: lesson.scheduled_start,
     end: eventEnd(lesson),
-    backgroundColor: EVENT_COLORS[lesson.status],
-    borderColor: EVENT_COLORS[lesson.status],
+    ...eventColors(lesson),
     editable: lesson.status === 'planned',
   }));
 

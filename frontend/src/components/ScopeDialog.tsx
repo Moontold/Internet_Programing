@@ -2,18 +2,24 @@ import { Button, Group, Radio, Stack } from '@mantine/core';
 import { modals } from '@mantine/modals';
 import { useState } from 'react';
 
-import type { LessonShort, Scope } from '../api/types';
+import type { ColorScope, LessonShort, Scope } from '../api/types';
 import { fmtDateTime, toIso } from '../lib/dates';
 
-function ScopeBody({ allowAll, onPick }: { allowAll: boolean; onPick: (scope: Scope | null) => void }) {
-  const [value, setValue] = useState<Scope>('this');
+const SCOPE_LABELS: Record<Scope, string> = {
+  this: 'Только это занятие',
+  following: 'Это и последующие занятия',
+  all: 'Все занятия серии',
+};
+
+function ScopeBody<T extends Scope>({ options, onPick }: { options: T[]; onPick: (scope: T | null) => void }) {
+  const [value, setValue] = useState<T>(options[0]);
   return (
     <Stack>
-      <Radio.Group value={value} onChange={(v) => setValue(v as Scope)}>
+      <Radio.Group value={value} onChange={(v) => setValue(v as T)}>
         <Stack gap="xs">
-          <Radio value="this" label="Только это занятие" />
-          <Radio value="following" label="Это и последующие занятия" />
-          {allowAll && <Radio value="all" label="Все занятия серии" />}
+          {options.map((option) => (
+            <Radio key={option} value={option} label={SCOPE_LABELS[option]} />
+          ))}
         </Stack>
       </Radio.Group>
       <Group justify="flex-end">
@@ -26,10 +32,10 @@ function ScopeBody({ allowAll, onPick }: { allowAll: boolean; onPick: (scope: Sc
   );
 }
 
-export function askScope(title: string, allowAll: boolean): Promise<Scope | null> {
+export function askScope<T extends Scope>(title: string, options: T[]): Promise<T | null> {
   return new Promise((resolve) => {
     let settled = false;
-    const settle = (scope: Scope | null) => {
+    const settle = (scope: T | null) => {
       if (settled) return;
       settled = true;
       resolve(scope);
@@ -39,7 +45,7 @@ export function askScope(title: string, allowAll: boolean): Promise<Scope | null
       onClose: () => settle(null),
       children: (
         <ScopeBody
-          allowAll={allowAll}
+          options={options}
           onPick={(scope) => {
             settle(scope);
             modals.close(id);
@@ -51,7 +57,14 @@ export function askScope(title: string, allowAll: boolean): Promise<Scope | null
 }
 
 export const askMoveScope = (lesson: LessonShort, newStart: Date) =>
-  lesson.series_id ? askScope(`Перенести на ${fmtDateTime(toIso(newStart))}`, true) : Promise.resolve<Scope>('this');
+  lesson.series_id && lesson.status !== 'held'
+    ? askScope<Scope>(`Перенести на ${fmtDateTime(toIso(newStart))}`, ['this', 'following', 'all'])
+    : Promise.resolve<Scope>('this');
 
 export const askCancelScope = (lesson: LessonShort, title: string) =>
-  lesson.series_id ? askScope(title, false) : Promise.resolve<Scope>('this');
+  lesson.series_id
+    ? askScope<Exclude<Scope, 'all'>>(title, ['this', 'following'])
+    : Promise.resolve<Exclude<Scope, 'all'>>('this');
+
+export const askColorScope = (lesson: LessonShort) =>
+  lesson.series_id ? askScope<ColorScope>('Применить цвет', ['this', 'all']) : Promise.resolve<ColorScope>('this');
