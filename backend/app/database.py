@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from asyncpg import Connection
 from sqlalchemy import delete, select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -92,12 +93,18 @@ class DataBaseWorker:
         self,
         model: Type[T],
         *conditions: Any,
+        options: Sequence[Any] = (),
         order_by: Optional[Any] = None,
+        limit: Optional[int] = None,
     ) -> Sequence[T]:
         async with self.create_session() as session:
             stmt = select(model).where(*conditions)
+            if options:
+                stmt = stmt.options(*options)
             if order_by is not None:
                 stmt = stmt.order_by(order_by)
+            if limit is not None:
+                stmt = stmt.limit(limit)
             result = await session.execute(stmt)
             return result.scalars().unique().all()
 
@@ -110,6 +117,16 @@ class DataBaseWorker:
     async def update_where(self, model: Type[T], *conditions: Any, values: dict[str, Any]) -> int:
         async with self.create_session() as session:
             result = await session.execute(update(model).where(*conditions).values(**values))
+            await session.commit()
+            return result.rowcount or 0
+
+    async def new_rows_ignore_conflicts(self, model: Type[T], rows: list[dict], index_elements: list[str]) -> int:
+        """Пакетная вставка, которая молча пропускает строки с уже занятым уникальным ключом."""
+        if not rows:
+            return 0
+        async with self.create_session() as session:
+            stmt = pg_insert(model).values(rows).on_conflict_do_nothing(index_elements=index_elements)
+            result = await session.execute(stmt)
             await session.commit()
             return result.rowcount or 0
 
