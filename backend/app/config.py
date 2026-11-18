@@ -28,6 +28,13 @@ class Settings(BaseSettings):
     # Должен совпадать с client_max_body_size в frontend/nginx.conf
     max_upload_mb: int = Field(default=50, ge=1)
 
+    # Напоминания worker'а: за сколько до занятия, через сколько после него и окно назад
+    notify_lead_hours: int = Field(default=24, ge=1)
+    notify_tutor_lead_minutes: int = Field(default=30, ge=1)
+    notify_homework_delay_minutes: int = Field(default=60, ge=1)
+    notify_homework_window_hours: int = Field(default=24, ge=1)
+    notifications_keep_days: int = Field(default=90, ge=1)
+
     @property
     def database_url(self) -> str:
         return (

@@ -10,6 +10,7 @@ from app.core.lesson_factory import build_lesson, series_rule
 from app.core.schedule import is_finished, missing_occurrences
 from app.database import DataBaseWorker, create_db
 from app.models import Lesson, LessonSeries, LessonStatus, LoginAttempt, Session
+from app.worker.notifier import Notifier
 
 MINUTE = 60
 HOUR = 3600
@@ -19,11 +20,12 @@ LOGIN_ATTEMPTS_KEEP = timedelta(days=1)
 
 
 class Scheduler:
-    """Фоновые задачи: порождение занятий из серий, закрытие прошедших, очистка сессий."""
+    """Фоновые задачи: порождение занятий из серий, закрытие прошедших, напоминания, очистка."""
 
     def __init__(self) -> None:
         self.log = logging.getLogger('Scheduler')
         self.db: DataBaseWorker = create_db()
+        self.notifier = Notifier(db=self.db)
 
     # --- задачи --------------------------------------------------------------------------
 
@@ -90,11 +92,12 @@ class Scheduler:
             self.log.info('Generated %s lessons', created)
 
     async def cleanup(self) -> None:
-        """Удаляет истёкшие сессии и старые записи о попытках входа."""
+        """Удаляет истёкшие сессии, старые записи о попытках входа и старые уведомления."""
         now = datetime.now(timezone.utc)
         sessions = await self.db.delete_where(Session, Session.expires_at < now)
         attempts = await self.db.delete_where(LoginAttempt, LoginAttempt.attempted_at < now - LOGIN_ATTEMPTS_KEEP)
         self.log.info('Cleanup: %s sessions, %s login attempts', sessions, attempts)
+        await self.notifier.purge_old()
 
     # --- цикл ----------------------------------------------------------------------------
 
@@ -117,4 +120,6 @@ class Scheduler:
             self._every(seconds=MINUTE, task=self.mark_finished_lessons, name='mark_finished_lessons'),
             self._every(seconds=HOUR, task=self.top_up_series, name='top_up_series'),
             self._every(seconds=DAY, task=self.cleanup, name='cleanup'),
+            self._every(seconds=5 * MINUTE, task=self.notifier.notify_upcoming, name='notify_upcoming'),
+            self._every(seconds=15 * MINUTE, task=self.notifier.notify_missing_homework, name='notify_missing_homework'),
         )
