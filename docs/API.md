@@ -53,7 +53,9 @@
 
 - `ParentCreate`: `{full_name, login, password, phone?, contacts_note?}`; логин — латиница,
   цифры и `_ . -`, от 3 символов; пароль не короче 8 символов.
-- `Parent`: `{id, full_name, phone, login, contacts_note, is_active, children: [{id, full_name, grade, is_active}]}`.
+- `Parent`: `{id, full_name, phone, login, contacts_note, is_active, children: [{id, full_name, grade, is_active}], balance, debt}`;
+  `balance` и `debt` — счёт родителя (см. «Финансы»).
+- Платежи родителя — `GET /parents/{id}/finance` и `POST /parents/{id}/payments`, см. раздел 9.
 
 ## 4. Ученики — `/api/students`
 
@@ -68,7 +70,8 @@
 | `POST /students/{id}/reset-password` | — → `{password}` | Новый пароль из 10 символов, сессии ученика завершаются |
 
 - `StudentCreate`: `{full_name, login, password, parent_id, grade?: 1..11, grade_note?, format: 'online' | 'offline', price_per_lesson?}`.
-- `StudentListItem`: `{id, full_name, grade, grade_note, format, is_active, parent: {id, full_name, phone}}`.
+- `StudentListItem`: `{id, full_name, grade, grade_note, format, is_active, parent: {id, full_name, phone}, parent_balance}`;
+  `parent_balance` — баланс счёта родителя: минус — долг.
 - `Student` = `StudentListItem` + `{login, price_per_lesson, series: Series[], stats}`, где `series` —
   действующие серии ученика (его регулярное расписание), `stats` —
   `{homework_done_percent, homework_avg_grade}`: доля сделанных домашек среди проверенных
@@ -118,7 +121,9 @@
   `own_color` — цвет задан у самого занятия, `title` — название
   серии, `format` — `online` / `offline` по участникам (`null`, если форматы разные),
   `has_homework` — есть текст или файлы домашки.
-- Участник: `{student_id, full_name, price, homework_status: 'not_checked' | 'done' | 'not_done', homework_grade}`.
+- Участник: `{student_id, full_name, price, homework_status: 'not_checked' | 'done' | 'not_done', homework_grade, paid}`;
+  `paid` — участие в проведённом занятии оплачено (`true` / `false`); `null` — занятие не проведено,
+  участник чужой или смотрит ученик. Плашка «Не оплачено» — `paid === false`.
 - `Lesson` = `LessonShort` + `{original_start, homework_text, homework_saved_at, parent_comment,
   tutor_notes, files: FileInfo[], previous_grade}`; `previous_grade` — оценка за предыдущую
   домашку, когда в занятии виден один ученик.
@@ -208,9 +213,42 @@
 
 | Метод и путь | Кто | `payload` | Что делает |
 |---|---|---|---|
-| `GET /parent/children` | родитель | `{children: [{student, series, stats}]}` | Дети с регулярным расписанием и статистикой домашек |
+| `GET /parent/children` | родитель | `{children: [{student, series, stats}], balance, debt}` | Дети с регулярным расписанием и статистикой домашек, баланс родителя |
+| `GET /parent/finance` | родитель | `{balance, debt}` | Свой баланс |
 | `GET /parent/children/{student_id}/lessons?start=&end=` | родитель | `{lessons: LessonShort[]}` | Занятия своего ребёнка за период; чужой ребёнок — «Нет доступа к этому ученику» |
 | `GET /student/lessons?start=&end=` | ученик | `{lessons: LessonShort[]}` | Свои занятия с домашками, оценками и плашкой `homework_pending` |
 | `GET /student/series` | ученик | `{series: Series[]}` | Своё регулярное расписание |
 
 Карточку занятия из кабинета открывают через `GET /lessons/{id}`, файлы — через `GET /files/{id}`.
+
+## 9. Финансы
+
+Раздел репетитора: родителю и ученику отвечает `403` (свой баланс родитель получает через
+`GET /parent/finance`). Правила расчёта и контрольные примеры — в документе
+«Правила финансов и уведомлений (спринт 3)».
+
+| Метод и путь | Тело → `payload` | Что делает |
+|---|---|---|
+| `GET /finance/summary` | — → `FinanceSummary` | Итоги долгов и предоплат и список родителей: должники первыми |
+| `GET /finance/stats?year=` | — → `{year, months: MonthStatsItem[]}` | Заработок по месяцам года (по умолчанию текущего) |
+| `GET /parents/{id}/finance` | — → `ParentFinance` | Баланс, неоплаченные занятия и платежи родителя |
+| `POST /parents/{id}/payments` | `PaymentCreate` → `Payment` | Внести платёж |
+| `PATCH /payments/{id}` | `PaymentUpdate` → `Payment` | Изменить сумму, дату или комментарий |
+| `DELETE /payments/{id}` | — → `null` | Удалить платёж |
+
+- `PaymentCreate`: `{amount, paid_on, comment?}`; `PaymentUpdate` — те же поля, все необязательны.
+  Сумма — целые рубли, минус — возврат или исправление. Ошибки: «Сумма платежа не может быть
+  нулевой», «Сумма платежа слишком большая» (по модулю больше 1 000 000), «Дата платежа не может
+  быть в будущем» (по дате часового пояса установки); комментарий длиннее 500 символов — `422`.
+- `Payment`: `{id, amount, paid_on, comment, created_at}`.
+- `ParentFinance`: `{balance, debt, unpaid: [{lesson_id, student_id, student_name, held_at, price}], payments: Payment[]}`;
+  `unpaid` — по порядку зачёта, ранние первыми; `payments` — новые первыми.
+- `FinanceSummary`: `{parents: [{parent: {id, full_name, phone}, balance, debt, unpaid_count}], total_debt, total_prepaid}`.
+- `MonthStatsItem`: `{month: 'YYYY-MM', lessons_count, earned, received}` — проведено занятий
+  (групповое — один раз), наработано по ставкам участников, получено по датам платежей.
+
+Баланс = Σ платежей − Σ ставок участий детей родителя в проведённых неудалённых занятиях;
+`debt = max(0, −balance)`. Платежи закрывают участия от самого раннего (по началу занятия,
+затем по `id` занятия и ученика); частично покрытое и все следующие не оплачены. Баланс и
+«оплачено» не хранятся, поэтому правка платежа, ставки или отмена проведённого занятия сразу
+меняют их везде.

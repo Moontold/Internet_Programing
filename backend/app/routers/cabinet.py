@@ -2,10 +2,12 @@ from fastapi import APIRouter, Depends
 from pydantic import AwareDatetime
 
 from app.models import User
-from app.routers.deps import get_cabinet_service, require_parent, require_student
+from app.routers.deps import get_cabinet_service, get_finance_service, require_parent, require_student
 from app.schemas.cabinet import ChildrenResponse, SeriesListResponse
+from app.schemas.finance import ParentBalanceResponse
 from app.schemas.lesson import LessonsResponse
 from app.services.cabinet_service import CabinetService
+from app.services.finance_service import FinanceService
 
 router = APIRouter(tags=['cabinet'])
 
@@ -27,6 +29,14 @@ async def parent_child_lessons(
     service: CabinetService = Depends(get_cabinet_service),
 ) -> LessonsResponse:
     return LessonsResponse(payload=await service.child_lessons(user=user, student_id=student_id, start=start, end=end))
+
+
+@router.get('/parent/finance', response_model=ParentBalanceResponse, summary='Кабинет родителя: свой баланс')
+async def parent_finance(
+    user: User = Depends(require_parent),
+    service: FinanceService = Depends(get_finance_service),
+) -> ParentBalanceResponse:
+    return ParentBalanceResponse(payload=await service.own_balance(user=user))
 
 
 @router.get('/student/lessons', response_model=LessonsResponse, summary='Кабинет ученика: свои занятия и домашки')

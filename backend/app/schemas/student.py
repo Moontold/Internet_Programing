@@ -27,6 +27,7 @@ class StudentShort(BaseModel):
 
 class StudentListItem(StudentShort):
     parent: ParentShort = Field(..., description='Родитель')
+    parent_balance: int = Field(default=0, description='Баланс счёта родителя, руб.')
 
 
 class Student(StudentListItem):

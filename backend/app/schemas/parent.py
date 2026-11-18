@@ -25,6 +25,8 @@ class Parent(ParentShort):
     contacts_note: str = Field(default='', description='Прочие контакты в свободной форме')
     is_active: bool = Field(..., description='Учётка активна: неактивный не может войти')
     children: list[ChildShort] = Field(default_factory=list, description='Дети')
+    balance: int = Field(default=0, description='Баланс счёта: платежи минус начисления, руб.')
+    debt: int = Field(default=0, description='Долг = max(0, −balance)')
 
 
 class ParentsList(BaseModel):

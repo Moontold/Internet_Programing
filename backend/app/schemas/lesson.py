@@ -22,6 +22,9 @@ class LessonParticipant(BaseModel):
         default=None, description='Статус домашки: не проверено / сделано / не сделано; скрыт для чужих'
     )
     homework_grade: Optional[int] = Field(default=None, description='Оценка 2..5; скрыта для чужих')
+    paid: Optional[bool] = Field(
+        default=None, description='Участие в проведённом занятии оплачено; null — не проведено, скрыто или смотрит ученик'
+    )
 
 
 class LessonShort(BaseModel):

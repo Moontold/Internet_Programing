@@ -2,7 +2,7 @@
 
 Репетитор видит всё. Родитель и ученик видят занятие, только если в нём участвует
 свой ребёнок или сам ученик; у остальных участников — только имя. Ученик не видит
-ставку и комментарий для родителя, заметки репетитора не видит никто, кроме него.
+ставку, признак «оплачено» и комментарий для родителя, заметки репетитора не видит никто, кроме него.
 """
 from dataclasses import dataclass
 from typing import Optional
@@ -16,6 +16,7 @@ from app.schemas.file import FileInfo
 class Access:
     role: str
     student_ids: Optional[frozenset[int]]  # None — репетитор, ему видны все ученики
+    paid_ids: Optional[frozenset[tuple[int, int]]] = None  # оплаченные (lesson_id, student_id); None — не загружены
 
     def can_see(self, student_id: int) -> bool:
         return self.student_ids is None or student_id in self.student_ids
@@ -38,7 +39,14 @@ def to_file_info(file: File) -> FileInfo:
     )
 
 
-def _participant(item: LessonStudent, access: Access) -> schemas.LessonParticipant:
+def _paid_flag(lesson: Lesson, item: LessonStudent, access: Access) -> Optional[bool]:
+    """«Оплачено» есть только у проведённого занятия; ученику и для чужих детей не отдаётся."""
+    if access.role == Role.STUDENT or access.paid_ids is None or lesson.status != LessonStatus.HELD:
+        return None
+    return (lesson.id, item.student_id) in access.paid_ids
+
+
+def _participant(lesson: Lesson, item: LessonStudent, access: Access) -> schemas.LessonParticipant:
     if not access.can_see(student_id=item.student_id):
         return schemas.LessonParticipant(student_id=item.student_id, full_name=item.student.user.full_name)
     return schemas.LessonParticipant(
@@ -47,6 +55,7 @@ def _participant(item: LessonStudent, access: Access) -> schemas.LessonParticipa
         price=item.price if access.role != Role.STUDENT else None,
         homework_status=item.homework_status,
         homework_grade=item.homework_grade,
+        paid=_paid_flag(lesson=lesson, item=item, access=access),
     )
 
 
@@ -83,7 +92,7 @@ def project_short(lesson: Lesson, access: Access, title: str, series_color: Opti
         topic=lesson.topic,
         title=title,
         format=_common_format(lesson=lesson),
-        participants=[_participant(item=item, access=access) for item in lesson.participants],
+        participants=[_participant(lesson=lesson, item=item, access=access) for item in lesson.participants],
         homework_pending=_homework_pending(lesson=lesson, access=access),
         has_homework=bool(lesson.homework_text.strip()) or bool(lesson.files),
     )
