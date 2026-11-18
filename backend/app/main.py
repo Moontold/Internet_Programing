@@ -9,7 +9,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.core.errors import AppError
 from app.database import async_session_maker
 from app.middleware import csrf_middleware
-from app.routers import auth, cabinet, files, finance, health, lessons, parents, series, students
+from app.routers import auth, cabinet, files, finance, health, lessons, notifications, parents, series, students
 from app.services.auth_service import AuthService
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(name)s: %(message)s')
@@ -65,3 +65,4 @@ app.include_router(lessons.router, prefix=API_PREFIX)
 app.include_router(files.router, prefix=API_PREFIX)
 app.include_router(cabinet.router, prefix=API_PREFIX)
 app.include_router(finance.router, prefix=API_PREFIX)
+app.include_router(notifications.router, prefix=API_PREFIX)

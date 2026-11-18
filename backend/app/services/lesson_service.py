@@ -1,6 +1,7 @@
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Sequence
+import logging
+from typing import Any, Awaitable, Optional, Sequence
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,9 +17,12 @@ from app.repositories.student_repository import StudentRepository
 from app.schemas import lesson as schemas
 from app.schemas.series import SeriesUpdate
 from app.services.finance_service import FinanceService
+from app.services.notification_service import NotificationService
 from app.services.series_service import SeriesService
 
 MAX_RANGE = timedelta(days=366)
+
+log = logging.getLogger('LessonService')
 
 
 def check_range(start: datetime, end: datetime) -> None:
@@ -44,6 +48,16 @@ class LessonService:
         self._parents = ParentRepository(db=db)
         self._series_service = SeriesService(db=db)
         self._finance = FinanceService(db=db)
+        self._notifications = NotificationService(db=db)
+
+    async def _safe_notify(self, coro: Awaitable[Any]) -> Any:
+        """Сбой уведомления пишется в лог и не ломает операцию, которая его вызвала."""
+        try:
+            return await coro
+        except Exception as exc:  # noqa: BLE001
+            log.exception('Notification failed: %s', exc)
+            await self._db.rollback()
+            return None
 
     # --- доступ ------------------------------------------------------------------------
 
@@ -154,6 +168,9 @@ class LessonService:
         if data.tutor_notes is not None:
             lesson.tutor_notes = data.tutor_notes
 
+        old_start = lesson.scheduled_start
+        was_held = lesson.status == LessonStatus.HELD
+        changed_series: list[int] = []
         schedule_touched = any(
             value is not None for value in (data.scheduled_start, data.duration_minutes, data.student_ids)
         )
@@ -171,17 +188,45 @@ class LessonService:
             if data.scope == 'this':
                 await self._apply_this(lesson=lesson, data=data)
             elif data.scope == 'following':
-                await self._series_service.split_from_lesson(
+                new_series = await self._series_service.split_from_lesson(
                     lesson=lesson,
                     new_start=data.scheduled_start,
                     duration_minutes=data.duration_minutes,
                     student_ids=data.student_ids,
                 )
+                changed_series = [new_series.id]
             else:
                 await self._apply_all(lesson=lesson, data=data)
+                changed_series = [lesson.series_id]
 
         await self._db.commit()
+        if schedule_touched and data.scheduled_start is not None:
+            if data.scope == 'this':
+                # Перенос проведённого — исправление записи, а не новость
+                if not was_held:
+                    await self._safe_notify(self._notifications.notify_moved(lesson=lesson, old_start=old_start))
+            else:
+                await self._safe_notify(self._notify_series_changed(series_ids=changed_series, link_lesson_id=lesson_id))
         return await self._reload(lesson_id=lesson_id)
+
+    async def _notify_series_changed(self, series_ids: Sequence[int], link_lesson_id: int) -> None:
+        """«Изменилось расписание», если правка серии затронула хотя бы одно будущее занятие."""
+        first = await self._lessons.first_future_planned(series_ids=series_ids, now=datetime.now(timezone.utc))
+        if first is not None:
+            await self._notifications.notify_schedule_changed(first_affected=first, link_lesson_id=link_lesson_id)
+
+    async def _prepare_cancel_following(self, lesson: Lesson) -> list:
+        """Черновики «Изменилось расписание» для отмены «это и последующие» — до самой отмены.
+
+        Обычные последующие занятия при отмене удаляются, поэтому первое затронутое ищется заранее.
+        """
+        now = datetime.now(timezone.utc)
+        planned = await self._lessons.planned_in_series(series_id=lesson.series_id, from_original_start=lesson.original_start)
+        future = [item for item in (lesson, *planned) if item.status == LessonStatus.PLANNED and item.scheduled_start > now]
+        if not future:
+            return []
+        first = min(future, key=lambda item: (item.scheduled_start, item.id))
+        return await self._notifications.schedule_changed_drafts(first_affected=first, link_lesson_id=lesson.id)
 
     async def _apply_this(self, lesson: Lesson, data: schemas.LessonUpdate) -> None:
         """«Только это»: правится одна строка, занятие становится отделённым от серии."""
@@ -232,12 +277,21 @@ class LessonService:
         if lesson.status == LessonStatus.CANCELLED:
             raise AppError('Занятие уже отменено')
         # У разового занятия «это и последующие» равносильно «только это» — так же, как при удалении
-        if scope == 'following' and lesson.series_id is not None:
+        following = scope == 'following' and lesson.series_id is not None
+        was_planned = lesson.status == LessonStatus.PLANNED
+        drafts: list = []
+        if following:
+            drafts = await self._safe_notify(self._prepare_cancel_following(lesson=lesson)) or []
             await self._series_service.cancel_following(lesson=lesson)
         else:
             lesson.status = LessonStatus.CANCELLED
             lesson.detached = True
         await self._db.commit()
+        if following:
+            if drafts:
+                await self._safe_notify(self._notifications.add(drafts=drafts))
+        elif was_planned:
+            await self._safe_notify(self._notifications.notify_cancelled(lesson=lesson))
         return await self._reload(lesson_id=lesson_id)
 
     async def delete(self, lesson_id: int, scope: str) -> None:
@@ -279,6 +333,9 @@ class LessonService:
         lesson.homework_text = text
         lesson.homework_saved_at = datetime.now(timezone.utc)
         await self._db.commit()
+        # Уведомляет первое непустое сохранение: повторные гасит ключ дедупликации
+        if lesson.status == LessonStatus.HELD and lesson.homework_text.strip():
+            await self._safe_notify(self._notifications.notify_homework(lesson=lesson))
         return await self._reload(lesson_id=lesson_id)
 
     async def update_participant(

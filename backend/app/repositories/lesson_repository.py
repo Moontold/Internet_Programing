@@ -82,6 +82,18 @@ class LessonRepository:
         result = await self._db.execute(stmt.order_by(Lesson.original_start))
         return result.scalars().all()
 
+    async def first_future_planned(self, series_ids: Sequence[int], now: datetime) -> Optional[Lesson]:
+        """Ближайшее будущее запланированное занятие этих серий — первое, кого коснулась правка серии."""
+        if not series_ids:
+            return None
+        stmt = (
+            self._base()
+            .where(Lesson.series_id.in_(list(series_ids)), Lesson.status == LessonStatus.PLANNED, Lesson.scheduled_start > now)
+            .order_by(Lesson.scheduled_start, Lesson.id)
+            .limit(1)
+        )
+        return (await self._db.execute(stmt)).scalars().first()
+
     async def list_between(
         self,
         start: datetime,
