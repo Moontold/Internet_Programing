@@ -13,6 +13,8 @@ class ChildCard(BaseModel):
 
 class ChildrenList(BaseModel):
     children: list[ChildCard] = Field(default_factory=list, description='Дети родителя')
+    balance: int = Field(default=0, description='Баланс родителя, руб.')
+    debt: int = Field(default=0, description='Долг родителя, руб.')
 
 
 class ChildrenResponse(BaseResponse):

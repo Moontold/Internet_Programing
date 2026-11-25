@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Sequence
 
@@ -14,6 +15,7 @@ from app.repositories.parent_repository import ParentRepository
 from app.repositories.student_repository import StudentRepository
 from app.schemas import lesson as schemas
 from app.schemas.series import SeriesUpdate
+from app.services.finance_service import FinanceService
 from app.services.series_service import SeriesService
 
 MAX_RANGE = timedelta(days=366)
@@ -41,6 +43,7 @@ class LessonService:
         self._students = StudentRepository(db=db)
         self._parents = ParentRepository(db=db)
         self._series_service = SeriesService(db=db)
+        self._finance = FinanceService(db=db)
 
     # --- доступ ------------------------------------------------------------------------
 
@@ -55,6 +58,16 @@ class LessonService:
         student = await self._students.get_by_user_id(user_id=user.id)
         return Access(role=user.role, student_ids=frozenset({student.id}) if student is not None else frozenset())
 
+    async def with_paid(self, access: Access, lessons: Sequence[Lesson]) -> Access:
+        """Добавляет к доступу оплаченные участия учеников этих занятий (репетитору и родителю)."""
+        if access.role == Role.STUDENT:
+            return access
+        student_ids = {item.student_id for lesson in lessons for item in lesson.participants}
+        if access.student_ids is not None:
+            student_ids &= access.student_ids
+        paid = await self._finance.paid_ids_for_students(student_ids=list(student_ids))
+        return replace(access, paid_ids=frozenset(paid))
+
     async def _get_or_raise(self, lesson_id: int) -> Lesson:
         lesson = await self._lessons.get(lesson_id=lesson_id)
         if lesson is None:
@@ -66,6 +79,7 @@ class LessonService:
         return await self._lessons.series_labels(series_ids=ids)
 
     async def _full(self, lesson: Lesson, access: Access) -> schemas.Lesson:
+        access = await self.with_paid(access=access, lessons=[lesson])
         label = (await self._labels(lessons=[lesson])).get(lesson.series_id or -1)
         previous_grade: Optional[int] = None
         visible = visible_student_ids(lesson=lesson, access=access)
@@ -86,6 +100,7 @@ class LessonService:
 
     async def project_list(self, lessons: Sequence[Lesson], access: Access) -> schemas.LessonsList:
         labels = await self._labels(lessons=lessons)
+        access = await self.with_paid(access=access, lessons=lessons)
         result = []
         for item in lessons:
             label = labels.get(item.series_id or -1)

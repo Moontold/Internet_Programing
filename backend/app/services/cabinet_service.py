@@ -12,6 +12,7 @@ from app.repositories.series_repository import SeriesRepository
 from app.repositories.student_repository import StudentRepository
 from app.schemas import cabinet as schemas
 from app.schemas.lesson import LessonsList
+from app.services.finance_service import FinanceService
 from app.services.lesson_service import LessonService, check_range
 from app.services.series_service import to_series_schema
 from app.services.student_service import to_student_short
@@ -27,6 +28,7 @@ class CabinetService:
         self._series = SeriesRepository(db=db)
         self._lessons = LessonRepository(db=db)
         self._lesson_service = LessonService(db=db)
+        self._finance = FinanceService(db=db)
 
     @staticmethod
     def _today() -> date:
@@ -46,7 +48,12 @@ class CabinetService:
         if parent is None:
             raise AppError('Профиль родителя не найден')
         students = await self._students.list_for_parent(parent_id=parent.id)
-        return schemas.ChildrenList(children=[await self._child_card(student=item) for item in students])
+        account = await self._finance.account_for_parent(parent_id=parent.id)
+        return schemas.ChildrenList(
+            children=[await self._child_card(student=item) for item in students],
+            balance=account.balance,
+            debt=account.debt,
+        )
 
     async def child_lessons(self, user: User, student_id: int, start: datetime, end: datetime) -> LessonsList:
         check_range(start=start, end=end)

@@ -15,6 +15,7 @@ from app.repositories.session_repository import SessionRepository
 from app.repositories.student_repository import StudentRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas import student as schemas
+from app.services.finance_service import FinanceService
 from app.services.parent_service import to_parent_short
 from app.services.series_service import to_series_schema
 
@@ -30,10 +31,11 @@ def to_student_short(student: Student) -> schemas.StudentShort:
     )
 
 
-def to_student_list_item(student: Student) -> schemas.StudentListItem:
+def to_student_list_item(student: Student, parent_balance: int = 0) -> schemas.StudentListItem:
     return schemas.StudentListItem(
         **to_student_short(student=student).model_dump(),
         parent=to_parent_short(parent=student.parent),
+        parent_balance=parent_balance,
     )
 
 
@@ -46,6 +48,7 @@ class StudentService:
         self._sessions = SessionRepository(db=db)
         self._series = SeriesRepository(db=db)
         self._lessons = LessonRepository(db=db)
+        self._finance = FinanceService(db=db)
 
     async def _get_or_raise(self, student_id: int) -> Student:
         student = await self._students.get(student_id=student_id)
@@ -61,8 +64,9 @@ class StudentService:
         today = datetime.now(timezone.utc).astimezone(settings.tz).date()
         series = await self._series.list_active_for_student(student_id=student.id, today=today)
         counts = await self._lessons.homework_counts(student_id=student.id)
+        account = await self._finance.account_for_parent(parent_id=student.parent_id)
         return schemas.Student(
-            **to_student_list_item(student=student).model_dump(),
+            **to_student_list_item(student=student, parent_balance=account.balance).model_dump(),
             login=student.user.login,
             price_per_lesson=student.price_per_lesson,
             series=[to_series_schema(series=item) for item in series],
@@ -71,7 +75,12 @@ class StudentService:
 
     async def list(self, is_active: Optional[bool]) -> schemas.StudentsList:
         students = await self._students.list_all(is_active=is_active)
-        return schemas.StudentsList(students=[to_student_list_item(student=item) for item in students])
+        balances: dict[int, int] = {}
+        for parent_id in {item.parent_id for item in students}:
+            balances[parent_id] = (await self._finance.account_for_parent(parent_id=parent_id)).balance
+        return schemas.StudentsList(students=[
+            to_student_list_item(student=item, parent_balance=balances[item.parent_id]) for item in students
+        ])
 
     async def get(self, student_id: int) -> schemas.Student:
         return await self.build_card(student=await self._get_or_raise(student_id=student_id))

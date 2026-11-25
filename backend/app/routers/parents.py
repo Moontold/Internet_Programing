@@ -2,9 +2,11 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends
 
-from app.routers.deps import get_parent_service, require_tutor
+from app.routers.deps import get_finance_service, get_parent_service, require_tutor
 from app.schemas.auth import PasswordPayload, PasswordResponse
+from app.schemas.finance import ParentFinanceResponse, PaymentCreate, PaymentResponse
 from app.schemas.parent import ParentCreate, ParentCreatedResponse, ParentResponse, ParentsResponse, ParentUpdate
+from app.services.finance_service import FinanceService
 from app.services.parent_service import ParentService
 
 router = APIRouter(prefix='/parents', tags=['parents'], dependencies=[Depends(require_tutor)])
@@ -47,3 +49,20 @@ async def reset_parent_password(
 ) -> PasswordResponse:
     password = await service.reset_password(parent_id=parent_id)
     return PasswordResponse(payload=PasswordPayload(password=password))
+
+
+@router.get('/{parent_id}/finance', response_model=ParentFinanceResponse, summary='Финансы родителя: баланс, неоплаченные, платежи')
+async def parent_finance(
+    parent_id: int,
+    service: FinanceService = Depends(get_finance_service),
+) -> ParentFinanceResponse:
+    return ParentFinanceResponse(payload=await service.parent_finance(parent_id=parent_id))
+
+
+@router.post('/{parent_id}/payments', response_model=PaymentResponse, summary='Внести платёж')
+async def add_payment(
+    parent_id: int,
+    body: PaymentCreate,
+    service: FinanceService = Depends(get_finance_service),
+) -> PaymentResponse:
+    return PaymentResponse(payload=await service.add_payment(parent_id=parent_id, data=body))
