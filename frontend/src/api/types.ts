@@ -94,6 +94,7 @@ export interface Series {
   interval_weeks: number;
   until: string | null;
   title: string;
+  color: string | null;
   students: SeriesStudent[];
 }
 export interface SeriesCreate {
@@ -126,6 +127,8 @@ export interface LessonShort {
   duration_minutes: number;
   status: LessonStatus;
   detached: boolean;
+  color: string | null;
+  own_color: boolean;
   topic: string;
   title: string;
   format: LessonFormat | null;
@@ -146,6 +149,11 @@ export interface LessonCreate {
   duration_minutes: number;
   title: string;
   student_ids: number[];
+}
+export type ColorScope = 'this' | 'all';
+export interface LessonColorUpdate {
+  scope: ColorScope;
+  color: string | null;
 }
 export interface LessonUpdate {
   scope?: Scope;

@@ -7,6 +7,7 @@ import { useCancelLesson, useLesson, useSaveHomework, useUpdateLesson } from '..
 import type { Lesson } from '../../api/types';
 import { useAuth } from '../../auth/AuthContext';
 import { HomeworkFiles } from '../../components/HomeworkFiles';
+import { LessonColorModal } from '../../components/LessonColorModal';
 import { MoveLessonModal } from '../../components/MoveLessonModal';
 import { ParticipantsTable } from '../../components/ParticipantsTable';
 import { askCancelScope } from '../../components/ScopeDialog';
@@ -45,6 +46,7 @@ export function LessonPage() {
   const [comment, setComment] = useDraft(lesson.data?.parent_comment);
   const [notes, setNotes] = useDraft(lesson.data?.tutor_notes);
   const [moveOpen, setMoveOpen] = useState(false);
+  const [colorOpen, setColorOpen] = useState(false);
 
   if (lesson.isError) return <Text c="dimmed">{lesson.error.message}</Text>;
   if (!lesson.data) return null;
@@ -54,7 +56,7 @@ export function LessonPage() {
 
   const doCancel = async () => {
     const scope = await askCancelScope(data, 'Отменить занятие');
-    if (!scope || scope === 'all') return;
+    if (!scope) return;
     cancel.mutate({ id: data.id, scope }, { onSuccess: ok('Занятие отменено'), onError });
   };
 
@@ -76,11 +78,12 @@ export function LessonPage() {
         </div>
         {isTutor && data.status !== 'cancelled' && (
           <Group>
-            {data.status === 'planned' && (
-              <Button variant="default" onClick={() => setMoveOpen(true)}>
-                Перенести
-              </Button>
-            )}
+            <Button variant="default" onClick={() => setColorOpen(true)}>
+              Цвет
+            </Button>
+            <Button variant="default" onClick={() => setMoveOpen(true)}>
+              Перенести
+            </Button>
             <Button variant="light" color="red" onClick={doCancel} loading={cancel.isPending}>
               Отменить
             </Button>
@@ -229,6 +232,7 @@ export function LessonPage() {
       )}
 
       <MoveLessonModal lesson={moveOpen ? data : null} onClose={() => setMoveOpen(false)} />
+      <LessonColorModal lesson={colorOpen ? data : null} onClose={() => setColorOpen(false)} />
     </Stack>
   );
 }

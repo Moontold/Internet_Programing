@@ -2,7 +2,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { toIso } from '../lib/dates';
 import { api, qs } from './client';
-import type { Lesson, LessonCreate, LessonShort, LessonUpdate, ParticipantUpdate, Scope } from './types';
+import type {
+  Lesson,
+  LessonColorUpdate,
+  LessonCreate,
+  LessonShort,
+  LessonUpdate,
+  ParticipantUpdate,
+  Scope,
+} from './types';
 
 export const LESSONS_KEY = 'lessons';
 
@@ -50,6 +58,11 @@ export const useCancelLesson = () =>
 export const useDeleteLesson = () =>
   useScheduleMutation(({ id, scope }: { id: number; scope: CancelScope }) =>
     api.del<null>(`/lessons/${id}${qs({ scope })}`),
+  );
+
+export const useSetLessonColor = () =>
+  useScheduleMutation(({ id, ...data }: LessonColorUpdate & { id: number }) =>
+    api.post<Lesson>(`/lessons/${id}/color`, data),
   );
 
 export const useSaveHomework = (id: number) =>
