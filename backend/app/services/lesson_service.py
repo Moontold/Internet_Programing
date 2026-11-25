@@ -7,9 +7,9 @@ from app.config import settings
 from app.core.errors import AppError
 from app.core.lesson_factory import build_lesson, sync_participants
 from app.core.projection import TUTOR_ACCESS, Access, project_full, project_short, visible_student_ids
-from app.core.schedule import shift_start
+from app.core.schedule import is_finished, shift_start
 from app.models import Lesson, LessonStatus, Role, User
-from app.repositories.lesson_repository import LessonRepository
+from app.repositories.lesson_repository import LessonRepository, SeriesLabel
 from app.repositories.parent_repository import ParentRepository
 from app.repositories.student_repository import StudentRepository
 from app.schemas import lesson as schemas
@@ -24,6 +24,14 @@ def check_range(start: datetime, end: datetime) -> None:
         raise AppError('Конец периода должен быть позже начала')
     if end - start > MAX_RANGE:
         raise AppError('Период не может быть больше года')
+
+
+def check_held_move(scope: str, new_start: datetime, duration_minutes: int, now: datetime) -> None:
+    """Перенос проведённого — исправление записи: только это занятие и только в прошлое."""
+    if scope != 'this':
+        raise AppError('Проведённое занятие переносится только с областью «только это занятие»')
+    if not is_finished(start=new_start, duration_minutes=duration_minutes, now=now):
+        raise AppError('Проведённое занятие можно перенести только на прошедшее время')
 
 
 class LessonService:
@@ -53,12 +61,12 @@ class LessonService:
             raise AppError('Занятие не найдено')
         return lesson
 
-    async def _titles(self, lessons: Sequence[Lesson]) -> dict[int, str]:
+    async def _labels(self, lessons: Sequence[Lesson]) -> dict[int, SeriesLabel]:
         ids = list({item.series_id for item in lessons if item.series_id is not None})
-        return await self._lessons.series_titles(series_ids=ids)
+        return await self._lessons.series_labels(series_ids=ids)
 
     async def _full(self, lesson: Lesson, access: Access) -> schemas.Lesson:
-        titles = await self._titles(lessons=[lesson])
+        label = (await self._labels(lessons=[lesson])).get(lesson.series_id or -1)
         previous_grade: Optional[int] = None
         visible = visible_student_ids(lesson=lesson, access=access)
         if len(visible) == 1:
@@ -66,7 +74,8 @@ class LessonService:
         return project_full(
             lesson=lesson,
             access=access,
-            title=titles.get(lesson.series_id or -1, ''),
+            title=label.title if label else '',
+            series_color=label.color if label else None,
             previous_grade=previous_grade,
         )
 
@@ -76,10 +85,17 @@ class LessonService:
         return await self._full(lesson=await self._get_or_raise(lesson_id=lesson_id), access=TUTOR_ACCESS)
 
     async def project_list(self, lessons: Sequence[Lesson], access: Access) -> schemas.LessonsList:
-        titles = await self._titles(lessons=lessons)
-        return schemas.LessonsList(lessons=[
-            project_short(lesson=item, access=access, title=titles.get(item.series_id or -1, '')) for item in lessons
-        ])
+        labels = await self._labels(lessons=lessons)
+        result = []
+        for item in lessons:
+            label = labels.get(item.series_id or -1)
+            result.append(project_short(
+                lesson=item,
+                access=access,
+                title=label.title if label else '',
+                series_color=label.color if label else None,
+            ))
+        return schemas.LessonsList(lessons=result)
 
     # --- чтение ------------------------------------------------------------------------
 
@@ -127,8 +143,14 @@ class LessonService:
             value is not None for value in (data.scheduled_start, data.duration_minutes, data.student_ids)
         )
         if schedule_touched:
+            # Уведомление о переносе проведённому не положено: в будущее его не перенести
             if lesson.status == LessonStatus.HELD and data.scheduled_start is not None:
-                raise AppError('Проведённое занятие нельзя перенести')
+                check_held_move(
+                    scope=data.scope,
+                    new_start=data.scheduled_start,
+                    duration_minutes=data.duration_minutes or lesson.duration_minutes,
+                    now=datetime.now(timezone.utc),
+                )
             if lesson.series_id is None and data.scope != 'this':
                 raise AppError('Занятие вне серии: доступен только режим «только это занятие»')
             if data.scope == 'this':
@@ -214,6 +236,20 @@ class LessonService:
         else:
             await self._lessons.soft_delete(lesson=lesson, now=now)
         await self._db.commit()
+
+    async def set_color(self, lesson_id: int, data: schemas.LessonColorUpdate) -> schemas.Lesson:
+        """«Только это» — свой цвет занятия; «все» — цвет серии, свои цвета её занятий снимаются."""
+        lesson = await self._get_editable(lesson_id=lesson_id)
+        if data.scope == 'this':
+            lesson.color = data.color
+        else:
+            if lesson.series_id is None:
+                raise AppError('Занятие вне серии: доступен только режим «только это занятие»')
+            series = await self._series_service.get_or_raise(series_id=lesson.series_id)
+            series.color = data.color
+            await self._lessons.reset_color_in_series(series_id=series.id)
+        await self._db.commit()
+        return await self._reload(lesson_id=lesson_id)
 
     # --- домашка и оценки ----------------------------------------------------------------
 

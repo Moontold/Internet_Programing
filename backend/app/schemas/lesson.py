@@ -9,6 +9,7 @@ from app.schemas.file import FileInfo
 Scope = Literal['this', 'following', 'all']
 Status = Literal['planned', 'held', 'cancelled']
 HomeworkStatus = Literal['not_checked', 'done', 'not_done']
+COLOR_PATTERN = r'^#[0-9a-fA-F]{6}$'
 
 
 class LessonParticipant(BaseModel):
@@ -30,6 +31,8 @@ class LessonShort(BaseModel):
     duration_minutes: int = Field(..., description='Длительность, минут')
     status: Status = Field(..., description='planned — запланировано, held — проведено, cancelled — отменено')
     detached: bool = Field(..., description='Изменено отдельно от серии')
+    color: Optional[str] = Field(default=None, description='Цвет #rrggbb: свой цвет занятия или цвет серии; null — без цвета')
+    own_color: bool = Field(default=False, description='Цвет задан у самого занятия, а не унаследован от серии')
     topic: str = Field(default='', description='Тема занятия')
     title: str = Field(default='', description='Название серии или пусто')
     format: Optional[Literal['offline', 'online']] = Field(
@@ -85,6 +88,11 @@ class LessonUpdate(BaseModel):
 
 class LessonCancel(BaseModel):
     scope: Literal['this', 'following'] = Field(default='this', description='Отменить только это или это и последующие')
+
+
+class LessonColorUpdate(BaseModel):
+    scope: Literal['this', 'all'] = Field(default='this', description='Цвет только этого занятия или всей серии')
+    color: Optional[str] = Field(default=None, pattern=COLOR_PATTERN, description='Цвет #rrggbb; null — без цвета')
 
 
 class HomeworkUpdate(BaseModel):

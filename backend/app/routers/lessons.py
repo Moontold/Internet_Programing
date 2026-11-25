@@ -11,6 +11,7 @@ from app.schemas.file import FileResponse
 from app.schemas.lesson import (
     HomeworkUpdate,
     LessonCancel,
+    LessonColorUpdate,
     LessonCreate,
     LessonResponse,
     LessonsResponse,
@@ -67,6 +68,16 @@ async def cancel_lesson(
     service: LessonService = Depends(get_lesson_service),
 ) -> LessonResponse:
     return LessonResponse(payload=await service.cancel(lesson_id=lesson_id, scope=body.scope))
+
+
+@router.post('/{lesson_id}/color', response_model=LessonResponse, summary='Цвет занятия или всей серии',
+             dependencies=[Depends(require_tutor)])
+async def set_lesson_color(
+    lesson_id: int,
+    body: LessonColorUpdate,
+    service: LessonService = Depends(get_lesson_service),
+) -> LessonResponse:
+    return LessonResponse(payload=await service.set_color(lesson_id=lesson_id, data=body))
 
 
 @router.delete('/{lesson_id}', response_model=OkResponse, summary='Удалить занятие', dependencies=[Depends(require_tutor)])
